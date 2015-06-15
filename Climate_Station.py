@@ -245,11 +245,17 @@ class Buttons(QtGui.QWidget):
         self.showClimate_B.resize(90, 30)
         self.showClimate_B.move(self.clmPos, self.top + 125)
         self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
+        
+        #Progress bar that shows for loading data and a button
+        self.pbar = QtGui.QProgressDialog(self)
+        self.pbar.setWindowTitle("Loading...")
+        self.pbar.setLabelText("Loading data from the Arduino and SD-card. \nThis may take several minutes.")
+        
         #Button for saving chosen data
         self.saveData_B = QtGui.QPushButton("Save Climate Data", self)
         self.saveData_B.resize(100, 30)
         self.saveData_B.move(self.clmPos + 90, self.top + 125)
-        #self.showClimate_B.clicked.connect()
+        #self.saveData_B.clicked.connect()
         
         
         #Title (needs frame preferably)
@@ -299,17 +305,22 @@ class Buttons(QtGui.QWidget):
         self.saveIR_B.resize(80,30)
         self.saveIR_B.move(self.logPos + 2*80, self.top + 160)
         
-        
         #Button for copying climate parameters
         self.copyClimate_B = QtGui.QPushButton("Copy Climate Parameters to Clipboard", self)
         self.copyClimate_B.minimumSizeHint
         self.copyClimate_B.move(self.logPos - 150, self.top + 250)
         self.copyClimate_B.clicked.connect(self.copyClimate)
         
+        
+        
     def showClimate_B_Pressed(self):
         #Bør omregne startDay og startSec til et start målepunkt og et antal målepunkter
         #Bør vise en progress bar, der kan 'Cancel'es hvis brugeren ikke gider vente mere
         #Bør sandsynligvis laves i en thread så man kan trykke 'Cancel'
+        self.pbar.show()
+        self.pbar.setValue(50)
+        
+        
         return
         
     
@@ -352,8 +363,6 @@ class Buttons(QtGui.QWidget):
             
                 
             
-    
-    
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
         if self.comboState is "Seconds":
