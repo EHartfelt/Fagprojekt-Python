@@ -16,6 +16,7 @@ from PyQt4 import QtCore, QtGui
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import math 
 #Other parts of the code
 from Startup import *
 
@@ -25,7 +26,6 @@ class LogThread(QtCore.QThread):
         QtCore.QThread.__init__(self)
         self.stopNow = False
         self.threadSerial = None
-        self.startTime = None
         self.timeNow = None
         self.logTime = 0
         self.start_Thread_Climate = None
@@ -54,7 +54,7 @@ class LogThread(QtCore.QThread):
                 pass
                 
         #Get starting time
-        self.startTime = time.clock()    
+        startTime = time.clock()    
         
         #Run the logging
         #Find ud af optimal rækkefølge
@@ -65,7 +65,7 @@ class LogThread(QtCore.QThread):
             
             
             #Stop after chosen time has passed
-            if (self.timeNow >= self.logTime or self.stopNow):
+            if (timeNow >= self.logTime or self.stopNow):
                 self.threadSerial.write("IRStop\n")
                 time.sleep(0.5)
                 print "I wrote stop"
@@ -77,15 +77,15 @@ class LogThread(QtCore.QThread):
             
             
             #Calculate the time
-            self.timeNow = time.clock() - self.startTime
+            timeNow = time.clock() - startTime
             
             #Get IR value
-            self.line = self.threadSerial.readline()
-            self.value = float(self.line)
+            line = self.threadSerial.readline()
+            value = float(line)
             
             #Write to arrays
-            self.iRArray[self.n] = self.value
-            self.timeArray[self.n] = self.timeNow
+            self.iRArray[self.n] = value
+            self.timeArray[self.n] = timeNow
             self.n += 1
         
         
@@ -113,7 +113,6 @@ class LogThread(QtCore.QThread):
         lineTemp = str(round(float(arConnect.readline()), 1))
         lineHum = str(float(arConnect.readline()))
         lineP = str(float(arConnect.readline()))
-        print lineP
         #Get the current time
         timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
         
@@ -207,13 +206,13 @@ class Buttons(QtGui.QWidget):
         #Serial connection
         self.buttonSerial = None
         #Combobox is set to seconds
-        self.comboState = "Seconds"
+        self.comboStateU = "Seconds"
         #Start and end climate for running measurements
         self.start_Climate = ""
         self.end_Climate = ""
         #First day and first sec sent from Arduino
-        self.firstDay = ""
-        self.firstSec = ""
+        self.firstDay = None
+        self.firstSec = None
         #Start and end day chosen by user
         self.startDay = None
         self.endDay = None
@@ -258,7 +257,8 @@ class Buttons(QtGui.QWidget):
         self.showClimate_B = QtGui.QPushButton("Plot Climate Data", self)
         self.showClimate_B.resize(90, 30)
         self.showClimate_B.move(self.clmPos, self.top + 125)
-        self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
+        #self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
+        
         
         #Progress bar that shows for loading data and a button
         self.pbar = QtGui.QProgressDialog(self)
@@ -269,7 +269,7 @@ class Buttons(QtGui.QWidget):
         self.saveData_B = QtGui.QPushButton("Save Climate Data", self)
         self.saveData_B.resize(100, 30)
         self.saveData_B.move(self.clmPos + 90, self.top + 125)
-        #self.saveData_B.clicked.connect()
+        self.saveData_B.clicked.connect(self.saveData_B_Pressed)
         
         
         #Title (needs frame preferably)
@@ -326,11 +326,89 @@ class Buttons(QtGui.QWidget):
         self.copyClimate_B.clicked.connect(self.copyClimate)
         
         
+    
+    def saveData_B_Pressed(self):
+        #Check if input is invalid
+        if (self.checkUserInput() == "Failure"):
+            return
+        #Pass the first data point and number of data points
+        firstData, nData = self.checkUserInput
+            
+        #Input is valid
+    
+    #Function for checking the user input. Returns "Failure" if something is wrong.
+    def checkUserInput(self):
+        #Bør omregne startDay og startSec til et start målepunkt og et antal målepunkter (v)
+        #Bør vise en progress bar, der kan 'Cancel'es hvis brugeren ikke gider vente mere 
+        #Bør også tjekke om start er efter slut og om start er før det første målepunkt, hvor den skriver hvis det ikke er. (v)
+    
+    
+        #Check if dates have been chosen
+        if self.startDay is None or self.endDay is None:
+            print "Please choose start- and end dates"
+            return "Failure"
         
-    def showClimate_B_Pressed(self):
-        #Bør omregne startDay og startSec til et start målepunkt og et antal målepunkter
-        #Bør vise en progress bar, der kan 'Cancel'es hvis brugeren ikke gider vente mere
-        #Bør også tjekke om start er efter slut og om start er før det første målepunkt, hvor den skriver hvis det ikke er
+        #Our time starts after 31/12/2014
+        startDate = date(2014,12,31)
+        
+        #Get the start date from the user input string and 
+        #convert to days since 31/12/2014
+        sDay = int(self.startDay[0:2])
+        sMonth = int(self.startDay[3:5])
+        sYear  = int(self.startDay[6:10])
+        
+        sDate = datetime(sYear, sMonth, sDay)
+        deltaStartDays = (sDate.date() - startDate).days
+        #Slet
+        print "Start date: " + str(deltaStartDays)
+        
+        #Get the end date from the user input string and 
+        #convert to days since 31/12/2014
+        eDay = int(self.endDay[0:2])
+        eMonth = int(self.endDay[3:5])
+        eYear  =int(self.endDay[6:10])
+        
+        eDate = datetime(eYear, eMonth, eDay)
+        deltaEndDays = (eDate.date() - startDate).days
+        #Slet
+        print "End date: " + str(deltaEndDays)
+        
+        
+        #Check if the start date comes before the end
+        if (deltaEndDays < deltaStartDays):
+            print "ERROR: End date comes before Start date"
+            return "Failure"
+        #Check if the data exists
+        elif deltaStartDays < self.firstDay:
+            print "ERROR: The start date is before the first day containing data."\
+            + "\nThe first day with data is: " + str(self.firstDay)
+            return "Failure"
+        
+        #If the start date is NOT the first day containing data
+        #And startDate != endDate
+        if (deltaStartDays != self.firstDay):
+            firstData = int(math.floor((deltaStartDays - self.firstDay)*288 -(self.firstSec/300)))
+            nData = (deltaEndDays - deltaStartDays + 1)*288
+            return firstData, nData
+            
+        #If the start date is the same as the first day containing data
+        #Mangler at skrive ting
+        if deltaStartDays == self.firstDay:
+            print "Hest"
+            
+        
+        #Hvis end date er i dag, skriv alligevel bare 288
+        
+           
+        
+        #Check if start comes before end (v)
+        
+        #If so: end-start => startpoint and number of measurements
+        #Specialtilfælde: Hvis den første valgte dag er lig den første dag med målepunkt
+        
+        #Write to Arduino about the desired data
+        
+        #Make a statusbar showing progress
         self.pbar.show()
         self.pbar.setValue(50)
         
@@ -379,10 +457,10 @@ class Buttons(QtGui.QWidget):
             
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
-        if self.comboState is "Seconds":
-            self.comboState = "Minutes"
+        if self.comboStateU is "Seconds":
+            self.comboStateU = "Minutes"
         else:
-            self.comboState = "Seconds"
+            self.comboStateU = "Seconds"
     
     #Function for when the user changes the logging time
     def changeTime(self):
@@ -399,13 +477,13 @@ class Buttons(QtGui.QWidget):
                     print "Please write an integer"
                     continue
         
-                if self.comboState is "Seconds":
+                if self.comboStateU is "Seconds":
                     self.timeChosen_L.setText("The logging time is: " + str(timeC) + " seconds")
                     #Set logTime to seconds
                     self.logTime = timeC
                     break
             
-                elif self.comboState is "Minutes":
+                elif self.comboStateU is "Minutes":
                     self.timeChosen_L.setText("The logging time is: " + str(timeC) + " minutes")
                     #Set logTime to 60 seconds pr. minute
                     self.logTime = timeC*60
