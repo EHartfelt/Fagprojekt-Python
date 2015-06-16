@@ -43,8 +43,11 @@ class LogThread(QtCore.QThread):
         self.iRArray = np.zeros(100*self.logTime)     
         self.timeArray = np.zeros(100*self.logTime)
         
+        #Remove items on the buffer (if any)
+        self.threadSerial.flushInput()
+        
         #Write command to Arduino
-        self.threadSerial.write("IRStart")
+        self.threadSerial.write("IRStart\n")
         
         #Wait for response
         while (self.threadSerial.inWaiting == 0):
@@ -54,20 +57,27 @@ class LogThread(QtCore.QThread):
         self.startTime = time.clock()    
         
         #Run the logging
+        #Find ud af optimal rækkefølge
         while True:
             
             while (self.threadSerial.inWaiting == 0):
                 pass
             
-            #Calculate the time
-            self.timeNow = time.clock() - self.startTime
-           
+            
             #Stop after chosen time has passed
             if (self.timeNow >= self.logTime or self.stopNow):
-                self.threadSerial.write("IRStop")
-                time.sleep(1)
+                self.threadSerial.write("IRStop\n")
+                time.sleep(0.5)
+                print "I wrote stop"
+                #Remove data on the buffer
+                self.threadSerial.flushInput()
                 self.end_Thread_Climate = self.getClimate() 
                 break
+            
+            
+            
+            #Calculate the time
+            self.timeNow = time.clock() - self.startTime
             
             #Get IR value
             self.line = self.threadSerial.readline()
@@ -96,13 +106,14 @@ class LogThread(QtCore.QThread):
     def getClimate(self):
         
         arConnect = self.threadSerial
-        arConnect.write("CopyClimate")
+        arConnect.write("CopyClimate\n")
         time.sleep(0.1)
         #Read temperature, humidity and pressure.
         #Convert to floats to get rid of \n and then to strings.
         lineTemp = str(round(float(arConnect.readline()), 1))
         lineHum = str(float(arConnect.readline()))
         lineP = str(float(arConnect.readline()))
+        print lineP
         #Get the current time
         timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
         
@@ -319,7 +330,7 @@ class Buttons(QtGui.QWidget):
     def showClimate_B_Pressed(self):
         #Bør omregne startDay og startSec til et start målepunkt og et antal målepunkter
         #Bør vise en progress bar, der kan 'Cancel'es hvis brugeren ikke gider vente mere
-        #Bør sandsynligvis laves i en thread så man kan trykke 'Cancel'
+        #Bør også tjekke om start er efter slut og om start er før det første målepunkt, hvor den skriver hvis det ikke er
         self.pbar.show()
         self.pbar.setValue(50)
         
@@ -328,7 +339,7 @@ class Buttons(QtGui.QWidget):
         
     
     #When 'Change Start' or 'Change End' is pressed
-    #Bør også tjekke om start er efter slut og om start er før det første målepunkt, hvor den skriver hvis det ikke er
+    
     def changeDay(self):
         #Check which button is pressed
         sender = self.sender()
@@ -461,13 +472,13 @@ class Buttons(QtGui.QWidget):
     def getClimate(self):
         
         arConnect = self.buttonSerial
-        arConnect.write("CopyClimate")
+        arConnect.write("CopyClimate\n")
         time.sleep(0.1)
         #Read temperature, humidity and pressure.
         #Convert to floats to get rid of \n and then to strings.
-        lineTemp = str(round(float(self.arConnect.readline()), 1))
-        lineHum = str(float(self.arConnect.readline()))
-        lineP = str(float(self.arConnect.readline()))
+        lineTemp = str(round(float(arConnect.readline()), 1))
+        lineHum = str(float(arConnect.readline()))
+        lineP = str(float(arConnect.readline()))
         #Get the current time
         timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
         
