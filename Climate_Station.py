@@ -37,7 +37,7 @@ class LogThread(QtCore.QThread):
         
         self.n = 0        
         
-        #self.start_Thread_Climate = self.getClimate()    
+        self.start_Thread_Climate = self.getClimate()    
         
         #Allocate arrays
         self.iRArray = np.zeros(100*self.logTime)     
@@ -65,7 +65,8 @@ class LogThread(QtCore.QThread):
             #Stop after chosen time has passed
             if (self.timeNow >= self.logTime or self.stopNow):
                 self.threadSerial.write("IRStop")
-                #self.end_Thread_Climate = self.getClimate()
+                time.sleep(1)
+                self.end_Thread_Climate = self.getClimate() 
                 break
             
             #Get IR value
@@ -77,6 +78,8 @@ class LogThread(QtCore.QThread):
             self.timeArray[self.n] = self.timeNow
             self.n += 1
         
+        
+               
         #Remove empty indices. Go to n because n is incremented one last time
         #before the while loop ends
         self.timeArray = self.timeArray[0:self.n]
@@ -92,21 +95,21 @@ class LogThread(QtCore.QThread):
     #Send message to the Arduino to pass on the current climate parameters.   
     def getClimate(self):
         
-        self.arConnect = self.threadSerial
-        self.arConnect.write("CopyClimate")
+        arConnect = self.threadSerial
+        arConnect.write("CopyClimate")
         time.sleep(0.1)
         #Read temperature, humidity and pressure.
         #Convert to floats to get rid of \n and then to strings.
-        self.lineTemp = str(round(float(self.arConnect.readline()), 1))
-        self.lineHum = str(float(self.arConnect.readline()))
-        self.lineP = str(float(self.arConnect.readline()))
+        lineTemp = str(round(float(arConnect.readline()), 1))
+        lineHum = str(float(arConnect.readline()))
+        lineP = str(float(arConnect.readline()))
         #Get the current time
-        self.timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
+        timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
         
-        self.climateText = "Temperature: " + self.lineTemp + " C , Humidity: " + self.lineHum \
-        + " % , Pressure: " + self.lineP + " mb" + " ; Time: " + self.timeNow
+        climateText = "Temperature: " + lineTemp + " C , Humidity: " + lineHum \
+        + " % , Pressure: " + lineP + " mb" + " ; Time: " + timeNow
         
-        return self.climateText
+        return climateText
         
         
 

@@ -114,7 +114,7 @@ class Startup(QtGui.QWidget):
                 #Calculate and send days since 31/12-2015
             self.ardConnect.write(self.timeMes)
             print "Time is sent"
-                #break
+                
             
         #Variable for first measurement, needed for SD-card readings
         self.firstDay = int(self.ardConnect.readline())
