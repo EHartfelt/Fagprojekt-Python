@@ -14,12 +14,14 @@ import sys
 from PyQt4 import QtCore, QtGui
 #To get current time
 import time
-import datetime
+#To get time in days since 31/12-2014 and seconds since midnight
+from datetime import datetime, date, timedelta
+#Work with arrays, plots and math
 import numpy as np
 import matplotlib.pyplot as plt
 import math 
 #Other parts of the code
-from Startup import *
+from Startup import Startup
 
 #A thread for logging, runs simultaneously with the main window
 class LogThread(QtCore.QThread):
@@ -336,6 +338,11 @@ class Buttons(QtGui.QWidget):
             return
         #Pass the first data point and number of data points
         firstData, nData = self.checkUserInput()
+        #Send a message to the Arduino with number of data and starting point
+
+        #Arduino sends: Temp, H, P, Day, Sec        
+        
+        
         
          #Make a statusbar showing progress
         self.pbar.show()
@@ -346,12 +353,9 @@ class Buttons(QtGui.QWidget):
         #Input is valid
     
     #Function for checking the user input. Returns "Failure" if something is wrong.
+    #Or a start measurement and a nr. of measurements for the Arduino.
     def checkUserInput(self):
-        #Bør omregne startDay og startSec til et start målepunkt og et antal målepunkter (v)
-        #Bør vise en progress bar, der kan 'Cancel'es hvis brugeren ikke gider vente mere 
-        #Bør også tjekke om start er efter slut og om start er før det første målepunkt, hvor den skriver hvis det ikke er. (v)
-    
-    
+        
         #Check if dates have been chosen
         if self.startDay is None or self.endDay is None:
             print "Please choose start- and end dates"
@@ -387,43 +391,35 @@ class Buttons(QtGui.QWidget):
         if (deltaEndDays < deltaStartDays):
             print "ERROR: End date comes before Start date"
             return "Failure"
+        
         #Check if the data exists
-        elif deltaStartDays < self.firstDay:
-            
-            """Make firstDay as date
-            
+        if deltaStartDays < self.firstDay:
             #First date containing data
-            firstDate = datetime.date(2014,12, 31) + datetime.timedelta(days=self.firstDay)
-            print firstDate
+            firstDate = date(2014,12,31) + timedelta(days=self.firstDay)
             
-            """
-            
+            #Print error
             print "ERROR: The start date is before the first day containing data."\
-            + "\nThe first day with data is: " + self.firstDay
+            + "\nThe first day with data is: " + firstDate
             return "Failure"
         
         #If the start date is NOT the first day containing data
-        #And startDate != endDate
+        #And startDate != endDate?
         if (deltaStartDays != self.firstDay):
             firstData = int(math.floor((deltaStartDays - self.firstDay)*288 -(self.firstSec/300)))
             nData = (deltaEndDays - deltaStartDays + 1)*288
             return firstData, nData
             
         #If the start date is the same as the first day containing data
-        #Mangler at skrive ting
         if deltaStartDays == self.firstDay:
-            print "Hest"
+            #Start from measurement nr. 1
+            firstData = 0
+            #Find nr. of datapoints
+            nData = (deltaEndDays - deltaStartDays)*288 + (24*3600-self.firstSec)/300
+            return firstData, nData
             
         
-        #Hvis end date er i dag, skriv alligevel bare 288
-        
-        
-       
-        return
-        
     
-    #When 'Change Start' or 'Change End' is pressed
-    
+    #When 'Change Start' or 'Change End' is pressed    
     def changeDay(self):
         #Check which button is pressed
         sender = self.sender()
@@ -457,10 +453,7 @@ class Buttons(QtGui.QWidget):
             #If the user closes the box
             elif not ok:
                 break
-            
-            
-                
-            
+           
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
         if self.comboStateU is "Seconds":
@@ -503,7 +496,8 @@ class Buttons(QtGui.QWidget):
     def start_B_Pressed(self):
         #Prompt user for emission coefficient and run error handling
         while True:
-            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient", "Enter the emission coefficient of the material\n (between 0.10 and 1.00)")
+            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient", "Enter the emission coefficient of the material\n \
+            (between 0.10 and 1.00)")
             if ok:
                 try:
                     emissionC = float(emissionC)
