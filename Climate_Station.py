@@ -14,6 +14,7 @@ import sys
 from PyQt4 import QtCore, QtGui
 #To get current time
 import time
+import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import math 
@@ -30,6 +31,7 @@ class LogThread(QtCore.QThread):
         self.logTime = 0
         self.start_Thread_Climate = None
         self.end_Thread_Climate = None
+        self.threadEmCoeff = None
         #Number of measured points
         self.n = 0
     
@@ -48,6 +50,8 @@ class LogThread(QtCore.QThread):
         
         #Write command to Arduino
         self.threadSerial.write("IRStart\n")
+        #Send Emission Coefficient
+        self.threadSerial.write(str(self.threadEmCoeff))
         
         #Wait for response
         while (self.threadSerial.inWaiting == 0):
@@ -63,6 +67,8 @@ class LogThread(QtCore.QThread):
             while (self.threadSerial.inWaiting == 0):
                 pass
             
+            #Calculate the time
+            timeNow = time.clock() - startTime
             
             #Stop after chosen time has passed
             if (timeNow >= self.logTime or self.stopNow):
@@ -73,11 +79,6 @@ class LogThread(QtCore.QThread):
                 self.threadSerial.flushInput()
                 self.end_Thread_Climate = self.getClimate() 
                 break
-            
-            
-            
-            #Calculate the time
-            timeNow = time.clock() - startTime
             
             #Get IR value
             line = self.threadSerial.readline()
@@ -218,6 +219,8 @@ class Buttons(QtGui.QWidget):
         self.endDay = None
         #Array of climate data (Not used yet)
         self.climateData = None
+        #IR-Emission Coefficient (0.1;1.0 -> 10;100)
+        self.emCoeff = 1.00
         
         
     #Make the buttons
@@ -332,7 +335,13 @@ class Buttons(QtGui.QWidget):
         if (self.checkUserInput() == "Failure"):
             return
         #Pass the first data point and number of data points
-        firstData, nData = self.checkUserInput
+        firstData, nData = self.checkUserInput()
+        
+         #Make a statusbar showing progress
+        self.pbar.show()
+        self.pbar.setValue(50)
+        
+        
             
         #Input is valid
     
@@ -380,8 +389,17 @@ class Buttons(QtGui.QWidget):
             return "Failure"
         #Check if the data exists
         elif deltaStartDays < self.firstDay:
+            
+            """Make firstDay as date
+            
+            #First date containing data
+            firstDate = datetime.date(2014,12, 31) + datetime.timedelta(days=self.firstDay)
+            print firstDate
+            
+            """
+            
             print "ERROR: The start date is before the first day containing data."\
-            + "\nThe first day with data is: " + str(self.firstDay)
+            + "\nThe first day with data is: " + self.firstDay
             return "Failure"
         
         #If the start date is NOT the first day containing data
@@ -399,20 +417,8 @@ class Buttons(QtGui.QWidget):
         
         #Hvis end date er i dag, skriv alligevel bare 288
         
-           
         
-        #Check if start comes before end (v)
-        
-        #If so: end-start => startpoint and number of measurements
-        #Specialtilfælde: Hvis den første valgte dag er lig den første dag med målepunkt
-        
-        #Write to Arduino about the desired data
-        
-        #Make a statusbar showing progress
-        self.pbar.show()
-        self.pbar.setValue(50)
-        
-        
+       
         return
         
     
@@ -495,11 +501,32 @@ class Buttons(QtGui.QWidget):
             
     #When the start button is pressed
     def start_B_Pressed(self):
+        #Prompt user for emission coefficient and run error handling
+        while True:
+            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient", "Enter the emission coefficient of the material\n (between 0.10 and 1.00)")
+            if ok:
+                try:
+                    emissionC = float(emissionC)
+                except ValueError:
+                    print "Please write a number"
+                    continue
+            
+                if (float(emissionC) >= 0.10 and float(emissionC) <= 1.00):
+                    self.emCoeff = emissionC
+                    break
+                else:
+                    print "Please choose a valid number"
+                    continue
+            else:
+                #Jump out of the function
+                return
+        
         #Create a thread for logging
         self.logThread = LogThread()
-        #Pass on the serial connection and logging time
+        #Pass on the serial connection, logging time and emission coefficient
         self.logThread.threadSerial = self.buttonSerial
         self.logThread.logTime = self.logTime
+        self.logThread.threadEmCoeff = self.emCoeff
         #Send signal to workThread that it shall emit to makePlot()
         self.connect(self.logThread, QtCore.SIGNAL('startlogging'), self.makePlot)
         #Run the funcion run() in the thread
