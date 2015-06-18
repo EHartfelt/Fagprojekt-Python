@@ -137,9 +137,44 @@ class ClimateStationWindow(QtGui.QMainWindow):
         self.firstSec = ""
         self.serialStatus = None
         self.serialConnection = None
+        self.initUI()
         self.runMain()
+    
+    def initUI(self):
+        #Window geometry
+        self.setGeometry(100, 75, 750, 450)
+        self.setWindowTitle("Climate Station Monitor")
         
-   
+        #Lock the window size
+        self.setMinimumSize(750, 450)
+        self.setMaximumSize(750, 450)
+        
+    #Draw lines in window 
+    def paintEvent(self, e):
+
+        qPainter = QtGui.QPainter()
+        qPainter.begin(self)
+        self.drawLines(qPainter)
+        qPainter.end()
+        
+    def drawLines(self, qPainter):
+      
+        pen = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.SolidLine)
+
+        qPainter.setPen(pen)
+        #Draw first frame
+        qPainter.drawLine(45, 55, 30, 55)
+        qPainter.drawLine(30, 55, 30, 360)
+        qPainter.drawLine(30, 360, 730, 360)
+        qPainter.drawLine(400, 360, 400, 55)
+        qPainter.drawLine(400, 55, 130, 55)
+        
+        #Draw second frame
+        qPainter.drawLine(445, 55, 400, 55)
+        qPainter.drawLine(730, 360, 730, 55)
+        qPainter.drawLine(730, 55, 610, 55)
+
+          
     
     def runMain(self):
         
@@ -167,13 +202,6 @@ class ClimateStationWindow(QtGui.QMainWindow):
         #Set the central widget (Put buttons in window)
         self.setCentralWidget(self.buttons)
         
-        #Window geometry
-        self.setGeometry(100, 75, 750, 400)
-        self.setWindowTitle("Climate Station Monitor")
-        
-        #Lock the window size
-        self.setMinimumSize(750, 400)
-        self.setMaximumSize(750, 400)
         
      
     #Question box for quitting the program
@@ -195,6 +223,11 @@ class ClimateStationWindow(QtGui.QMainWindow):
         
         if e.key() == QtCore.Qt.Key_Escape:
             self.close()
+    
+        
+        
+            
+        
 
 
 #Class for creating all the buttons. Contains methods for when a button is pressed.
@@ -334,7 +367,7 @@ class Buttons(QtGui.QWidget):
         #Button for copying climate parameters
         self.copyClimate_B = QtGui.QPushButton("Copy Climate Parameters to Clipboard", self)
         self.copyClimate_B.minimumSizeHint
-        self.copyClimate_B.move(self.logPos - 200, self.top + 300)
+        self.copyClimate_B.move(self.logPos - 200, self.top + 350)
         self.copyClimate_B.clicked.connect(self.copyClimate)
         
         
@@ -541,7 +574,7 @@ class Buttons(QtGui.QWidget):
 
         atStart = self.logThread.start_Thread_Climate
         atEnd = self.logThread.end_Thread_Climate        
-        theHeader = str(atStart) + "\n" + str(atEnd)
+        theHeader = str(atStart) + "\n" + str(atEnd) + "\n" + "Column 1: Time in seconds, Column 2: Temperature in Celsius"
         
         length = len(timeArray) 
         iRMatrix = np.array([timeArray[1:length], iRArray[1:length]])
