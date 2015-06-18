@@ -33,7 +33,6 @@ class LogThread(QtCore.QThread):
         self.logTime = 0
         self.start_Thread_Climate = None
         self.end_Thread_Climate = None
-        self.threadEmCoeff = None
         #Number of measured points
         self.n = 0
     
@@ -52,8 +51,7 @@ class LogThread(QtCore.QThread):
         
         #Write command to Arduino
         self.threadSerial.write("IRStart\n")
-        #Send Emission Coefficient
-        self.threadSerial.write(str(self.threadEmCoeff))
+        
         
         #Wait for response
         while (self.threadSerial.inWaiting == 0):
@@ -80,6 +78,8 @@ class LogThread(QtCore.QThread):
                 #Remove data on the buffer
                 self.threadSerial.flushInput()
                 self.end_Thread_Climate = self.getClimate() 
+                #Set stop flag to false for next logging
+                self.stopNow = False
                 break
             
             #Get IR value
@@ -232,7 +232,6 @@ class Buttons(QtGui.QWidget):
         self.clmPos = 50
         self.logPos = 450
         
-        
         #Label
         self.plotLabel = QtGui.QLabel("<b>Climate Data</b>", self)
         self.plotLabel.move(self.clmPos, self.top)
@@ -324,10 +323,18 @@ class Buttons(QtGui.QWidget):
         self.saveIR_B.resize(80,30)
         self.saveIR_B.move(self.logPos + 2*80, self.top + 160)
         
+        self.emCoeff_B = QtGui.QPushButton("Change Emission Factor", self)
+        self.emCoeff_B.clicked.connect(self.emCoeff_B_Pressed)
+        self.emCoeff_B.resize(125, 30)
+        self.emCoeff_B.move(self.logPos, self.top + 250)
+        
+        self.emCoeff_L = QtGui.QLabel("The emission factor is:       ", self)
+        self.emCoeff_L.move(self.logPos, self.top + 225)
+        
         #Button for copying climate parameters
         self.copyClimate_B = QtGui.QPushButton("Copy Climate Parameters to Clipboard", self)
         self.copyClimate_B.minimumSizeHint
-        self.copyClimate_B.move(self.logPos - 150, self.top + 250)
+        self.copyClimate_B.move(self.logPos - 200, self.top + 300)
         self.copyClimate_B.clicked.connect(self.copyClimate)
         
         
@@ -344,7 +351,7 @@ class Buttons(QtGui.QWidget):
         
         
         
-         #Make a statusbar showing progress
+        #Make a statusbar showing progress
         self.pbar.show()
         self.pbar.setValue(50)
         
@@ -399,7 +406,7 @@ class Buttons(QtGui.QWidget):
             
             #Print error
             print "ERROR: The start date is before the first day containing data."\
-            + "\nThe first day with data is: " + firstDate
+            + "\nThe first day with data is: " + str(firstDate.day) + "/" + str(firstDate.month) + "/" + str(firstDate.year)
             return "Failure"
         
         #If the start date is NOT the first day containing data
@@ -494,27 +501,7 @@ class Buttons(QtGui.QWidget):
             
     #When the start button is pressed
     def start_B_Pressed(self):
-        #Prompt user for emission coefficient and run error handling
-        while True:
-            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient", "Enter the emission coefficient of the material\n \
-            (between 0.10 and 1.00)")
-            if ok:
-                try:
-                    emissionC = float(emissionC)
-                except ValueError:
-                    print "Please write a number"
-                    continue
-            
-                if (float(emissionC) >= 0.10 and float(emissionC) <= 1.00):
-                    self.emCoeff = emissionC
-                    break
-                else:
-                    print "Please choose a valid number"
-                    continue
-            else:
-                #Jump out of the function
-                return
-        
+       
         #Create a thread for logging
         self.logThread = LogThread()
         #Pass on the serial connection, logging time and emission coefficient
@@ -565,6 +552,37 @@ class Buttons(QtGui.QWidget):
         #Insert climate parameters in header
         if ok:
             np.savetxt(str(filename)+".txt", iRMatrix, fmt = "%.2f", delimiter = " ", header = theHeader)
+            
+    
+    def emCoeff_B_Pressed(self):  
+        #Prompt user for emission coefficient and run error handling      
+        while True:
+            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient", "Enter the emission coefficient of the material\n \
+            (between 0.10 and 1.00)")
+            if ok:
+                try:
+                    emissionC = float(emissionC)
+                except ValueError:
+                    print "Please write a number"
+                    continue
+            
+                if (float(emissionC) >= 0.10 and float(emissionC) <= 1.00):
+                    self.emCoeff = emissionC
+                    break
+                else:
+                    print "Please choose a valid number"
+                    continue
+            else:
+                #Jump out of the function
+                return
+        self.emCoeff = emissionC
+                
+        #Send Emission Coefficient
+        self.buttonSerial.write(str(self.emCoeff))
+        
+        #Write to GUI
+        self.emCoeff_L.setText("The emission factor is: " + str(self.emCoeff))
+        return
         
         
     #Send message to the Arduino to pass on the current climate parameters.   

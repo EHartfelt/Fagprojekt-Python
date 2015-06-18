@@ -3,6 +3,12 @@
 Created on Mon Jun 15 10:25:55 2015
 
 @author: Emil
+
+This Startup object is the one that initializes the serial connection by
+prompting the user for a USB port (COM), establishing connection with the 
+Arduino and sending the current time and receiving the first day and time where
+there is data on the SD card.
+
 """
 
 
