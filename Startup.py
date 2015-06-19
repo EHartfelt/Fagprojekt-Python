@@ -24,6 +24,7 @@ class Startup(QtGui.QWidget):
     #Initiate
     def __init__(self):
         super(Startup, self).__init__()
+        self.emSCoeff = None
         self.port = self.showDialog()
         
          
@@ -128,4 +129,5 @@ class Startup(QtGui.QWidget):
         #Receive
         self.emSCoeff = float(self.ardConnect.readline())
         print "The emcoeff is " + str(self.emSCoeff)
+        
         return self.firstDay, self.firstSec, self.emSCoeff

@@ -63,7 +63,7 @@ class LogThread(QtCore.QThread):
         #Run the logging
         #Find ud af optimal rækkefølge
         while True:
-            
+            #Wait for input
             while (self.threadSerial.inWaiting == 0):
                 pass
             
@@ -74,9 +74,11 @@ class LogThread(QtCore.QThread):
             if (timeNow >= self.logTime or self.stopNow):
                 self.threadSerial.write("IRStop\n")
                 time.sleep(0.5)
+                #Slet
                 print "I wrote stop"
                 #Remove data on the buffer
                 self.threadSerial.flushInput()
+                #Get climate at end
                 self.end_Thread_Climate = self.getClimate() 
                 #Set stop flag to false for next logging
                 self.stopNow = False
@@ -90,22 +92,21 @@ class LogThread(QtCore.QThread):
             self.iRArray[self.n] = value
             self.timeArray[self.n] = timeNow
             self.n += 1
-        
-        
-               
+            
+         
         #Remove empty indices. Go to n because n is incremented one last time
         #before the while loop ends
         self.timeArray = self.timeArray[0:self.n]
         self.iRArray = self.iRArray[0:self.n]
-        #Get climate at end
+        
         
         #Emits signal: 1. Receive QtCore.SIGNAL('startlogging'), then send iRArray and timeArray
         self.emit(QtCore.SIGNAL('startlogging'), self.iRArray, self.timeArray)
         
-        #print self.iRArray
-        return     
+            
+        return    
     
-    #Send message to the Arduino to pass on the current climate parameters.   
+    #Send message to the Arduino to pass on the current climate parameters.
     def getClimate(self):
         
         arConnect = self.threadSerial
@@ -123,6 +124,19 @@ class LogThread(QtCore.QThread):
         + " % , Pressure: " + lineP + " mb" + " ; Time: " + timeNow
         
         return climateText
+            
+            
+class LoadThread(QtCore.QThread):
+    #A thread for loading data so the user can press 'Cancel' on the progress bar
+    def __init__(self):
+        QtCore.QThread.__init__(self)
+        self.threadSerial
+        
+        
+               
+         
+    
+    
         
         
 
@@ -257,7 +271,7 @@ class Buttons(QtGui.QWidget):
         self.endDay = None
         #Array of climate data (Not used yet)
         self.climateDataM = None
-        #IR-Emission Coefficient (0.1;1.0 -> 10;100)
+        #IR-Emission Coefficient [0.1;1.0]
         self.emCoeff = None
         #Initiate buttons
         self.initButtons()
@@ -386,38 +400,90 @@ class Buttons(QtGui.QWidget):
     def printEmCoeff(self, emCoefficient):
         self.emCoeff_L.setText("The emission factor is: " + str(emCoefficient) + " ")
 
-        
+    #Doesn't work yet...    
     def loadData_B_Pressed(self):
+        
+        #Pass the first data point and number of data points
+        firstData, nData = self.checkUserInput()
+        
+        #Make a statusbar showing progress
+        self.pbar.setMinimum(0)
+        self.pbar.setMaximum(nData)
+        self.pbar.show()
+        self.pbar.setValue(0)
+        
+        loadConnect = self.buttonSerial        
+        
         #Check if input is invalid
         if (self.checkUserInput() == "Failure"):
             return
-        #Pass the first data point and number of data points
-        firstData, nData = self.checkUserInput()
-        #Send a message to the Arduino with number of data and starting point
+        
+        
         print firstData, nData
-        T = np.zeros(nData)
-        H = np.zeros(nData)
-        P = np.zeros(nData)
-        D = np.zeros(nData)
-        S = np.zeros(nData)
-        self.climateDataM = np.array([T, H, P, D, S])
+        #Allocate a matrix of zeros for all the data
+        T = [0]*nData
+        H = [0]*nData
+        P = [0]*nData
+        D = [0]*nData
+        S = [0]*nData
+        self.climateDataM = ([T, H, P, D, S])
         
-        print self.climateDataM
-        """
+       
+        
         #Clear input buffer if any
-        self.buttonSerial.flushInput()
-        self.buttonSerial.write("")
-                
+        loadConnect.flushInput()
+        loadConnect.write("ClimateHistory\n")
+        loadConnect.write(str(firstData)+"\n")
+        loadConnect.write(str(nData)+"\n")
         
+        nCounts = 0
+                
+        #Load data until stop signal
         while True:
-            pass
-        """
+            
+            while loadConnect.inWaiting() == 0:
+                pass
+            
+            
+            #Read line
+            line = str(loadConnect.readline())
+            
+            #Check for stop-signal
+            if ("Stop" in line or nCounts == nData or self.pbar.wasCanceled()):
+                break
+            
+            #Read line into array
+            #Split line
+            lineArray = line.split(' , ')
+            print lineArray
+            #Convert strings to float
+            lineArray = map(float, lineArray)
+            print nCounts
+            #print lineArray
+            
+            
+            for i in range(0, 5):
+                self.climateDataM[i][nCounts] = lineArray[i]
+           
+            
+            #Increment number of points
+            nCounts += 1
+            
+            self.pbar.setValue(nCounts)
+        
+        self.pbar.setValue(nData)
+        time.sleep(0.4)
+        #self.pbar.close()
+        # 2 for test, go for 1
+        self.climateDataM = self.climateDataM[:][0:nCounts + 1]
+        #Print matrix for test
+        print self.climateDataM
+        
+        
         #Arduino sends: Temp, H, P, Day, Sec        
         
         
-        #Make a statusbar showing progress
-        self.pbar.show()
-        self.pbar.setValue(50)
+        
         
         
         #Input is valid
@@ -577,7 +643,6 @@ class Buttons(QtGui.QWidget):
         #Pass on the serial connection, logging time and emission coefficient
         self.logThread.threadSerial = self.buttonSerial
         self.logThread.logTime = self.logTime
-        self.logThread.threadEmCoeff = self.emCoeff
         #Send signal to workThread that it shall emit to makePlot()
         self.connect(self.logThread, QtCore.SIGNAL('startlogging'), self.makePlot)
         #Run the funcion run() in the thread
@@ -637,7 +702,7 @@ class Buttons(QtGui.QWidget):
                     continue
             
                 if (float(emissionC) >= 0.10 and float(emissionC) <= 1.00):
-                    self.emCoeff = emissionC
+                    self.emCoeff = round(emissionC, 2)
                     break
                 else:
                     print "Please choose a valid number"
