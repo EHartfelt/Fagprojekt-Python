@@ -125,20 +125,6 @@ class LogThread(QtCore.QThread):
         
         return climateText
             
-            
-class LoadThread(QtCore.QThread):
-    #A thread for loading data so the user can press 'Cancel' on the progress bar
-    def __init__(self):
-        QtCore.QThread.__init__(self)
-        self.threadSerial
-        
-        
-               
-         
-    
-    
-        
-        
 
 #Main class, initiates main window and other objects
 class ClimateStationWindow(QtGui.QMainWindow):
@@ -324,8 +310,10 @@ class Buttons(QtGui.QWidget):
         
         #Progress bar that shows for loading data and a button
         self.pbar = QtGui.QProgressDialog(self)
+        self.pbar.setCancelButton(None)
         self.pbar.setWindowTitle("Loading...")
-        self.pbar.setLabelText("Loading data from the Arduino and SD-card. \nThis may take several minutes.")
+        self.pbar.setLabelText("Loading data from the Arduino and SD-card. \nThis may take several minutes.\n\
+        The program will be frozen while loading.")
         
        
         #Button for saving chosen data
@@ -403,6 +391,11 @@ class Buttons(QtGui.QWidget):
     #Doesn't work yet...    
     def loadData_B_Pressed(self):
         
+        #Check if input is invalid
+        if (self.checkUserInput() == "Failure"):
+            return        
+        
+        
         #Pass the first data point and number of data points
         firstData, nData = self.checkUserInput()
         
@@ -414,9 +407,7 @@ class Buttons(QtGui.QWidget):
         
         loadConnect = self.buttonSerial        
         
-        #Check if input is invalid
-        if (self.checkUserInput() == "Failure"):
-            return
+        
         
         
         print firstData, nData
@@ -444,22 +435,20 @@ class Buttons(QtGui.QWidget):
             while loadConnect.inWaiting() == 0:
                 pass
             
-            
+            #Arduino sends: Temp, H, P, Day, Sec 
             #Read line
             line = str(loadConnect.readline())
             
             #Check for stop-signal
-            if ("Stop" in line or nCounts == nData or self.pbar.wasCanceled()):
+            if ("Stop" in line or nCounts == nData):
                 break
             
             #Read line into array
             #Split line
             lineArray = line.split(' , ')
-            print lineArray
             #Convert strings to float
             lineArray = map(float, lineArray)
-            print nCounts
-            #print lineArray
+            
             
             
             for i in range(0, 5):
@@ -473,30 +462,21 @@ class Buttons(QtGui.QWidget):
         
         self.pbar.setValue(nData)
         time.sleep(0.4)
-        #self.pbar.close()
-        # 2 for test, go for 1
-        self.climateDataM = self.climateDataM[:][0:nCounts + 1]
+        self.pbar.close()
+        #Remove zeros at end
+        
         #Print matrix for test
         print self.climateDataM
         
         
-        #Arduino sends: Temp, H, P, Day, Sec        
-        
-        
-        
-        
-        
-        #Input is valid
-    
-        #Function for checking the user input. Returns "Failure" if something is wrong.
-        #Or a start measurement and a nr. of measurements for the Arduino.
-    
     def saveData_B_Pressed(self):
         pass
     
     def showClimate_B_Pressed(self):
         pass
     
+    #Function for checking the user input of the dates. Returns "Failure" if something is wrong.
+        #Or a start measurement and a nr. of measurements for the Arduino.
     def checkUserInput(self):
         
         #Check if dates have been chosen
@@ -543,6 +523,11 @@ class Buttons(QtGui.QWidget):
             #Print error
             print "ERROR: The start date is before the first day containing data."\
             + "\nThe first day with data is: " + str(firstDate.day) + "/" + str(firstDate.month) + "/" + str(firstDate.year)
+            return "Failure"
+            
+        #If the end day is in the future
+        if deltaEndDays > (datetime.now().date() - startDate).days:
+            print "ERROR: The end day is in the future!"
             return "Failure"
         
         #If the start date is NOT the first day containing data
