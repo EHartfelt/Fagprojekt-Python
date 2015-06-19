@@ -133,8 +133,9 @@ class ClimateStationWindow(QtGui.QMainWindow):
         #Inherit from QtGui.QMainWindow and initiate
         super(ClimateStationWindow, self).__init__()
         self.things = None
-        self.firstDay = ""
-        self.firstSec = ""
+        self.firstDay = None
+        self.firstSec = None
+        self.emCoeffS = None
         self.serialStatus = None
         self.serialConnection = None
         self.initUI()
@@ -180,24 +181,33 @@ class ClimateStationWindow(QtGui.QMainWindow):
         
         #Create instance of standby          
         self.startup = Startup()  
-        #Initialize the serial port and return the connection variable and status
-        self.things = self.startup.initSerial()
-        #Send time to the Arduino at startup,  only runs once pr. startup
-        self.firstDay, self.firstSec = self.startup.sendReceiveTime() 
-        #Might be better as a signal event
-        self.serialStatus = self.things[0]
-        self.serialConnection = self.things[1]
         
-        #Print serial status to statusbar for 5 seconds
-        self.statusBar().showMessage(self.serialStatus, 5000)
+        #Initialize the serial port and return the connection variable and status
+        self.serialStatus, self.serialConnection = self.startup.initSerial()
+        
+        #Get first day, first sec and emission coefficient
+        #self.things is an array.
+        self.things = self.startup.sendReceive()
+        self.firstDay = self.things[0]
+        self.firstSec = self.things[1]
+        self.emCoeffS = self.things[2]
         
         #Create an instane of the button class
         self.buttons = Buttons()
         #Pass on the serial connection
         self.buttons.buttonSerial = self.serialConnection
-        #Pass time for the first measurement to the Buttons object as list appendix
-        self.buttons.firstDay = self.firstDay
+        
+        #Pass the first day, first second and emission coefficient to buttons
+        self.buttons.firstDay = self.firstDay    
         self.buttons.firstSec = self.firstSec
+        self.buttons.emCoeff = self.emCoeffS
+        #Print Emission Coefficient to GUI
+        self.buttons.printEmCoeff(self.buttons.emCoeff)
+          
+        
+        #Print serial status to statusbar for 5 seconds
+        self.statusBar().showMessage(self.serialStatus, 5000)
+        
         
         #Set the central widget (Put buttons in window)
         self.setCentralWidget(self.buttons)
@@ -225,18 +235,11 @@ class ClimateStationWindow(QtGui.QMainWindow):
             self.close()
     
         
-        
-            
-        
-
-
 #Class for creating all the buttons. Contains methods for when a button is pressed.
 class Buttons(QtGui.QWidget):
     #Constructor
     def __init__(self):
         super(Buttons, self).__init__()
-        #Initiate buttons
-        self.initButtons()
         #The logging time i set to 0
         self.logTime = 0
         #Serial connection
@@ -253,10 +256,12 @@ class Buttons(QtGui.QWidget):
         self.startDay = None
         self.endDay = None
         #Array of climate data (Not used yet)
-        self.climateData = None
+        self.climateDataM = None
         #IR-Emission Coefficient (0.1;1.0 -> 10;100)
-        self.emCoeff = 1.00
-        
+        self.emCoeff = None
+        #Initiate buttons
+        self.initButtons()
+      
         
     #Make the buttons
     def initButtons(self):
@@ -289,11 +294,17 @@ class Buttons(QtGui.QWidget):
         self.lDayButton.move(self.clmPos + 175, self.top + 70)
         self.lDayButton.resize(80, 20)
         
+        #Button for loading climate data
+        self.loadData_B = QtGui.QPushButton("Load Climate Data", self)
+        self.loadData_B.resize(100,30)
+        self.loadData_B.move(self.clmPos, self.top + 120)
+        self.loadData_B.clicked.connect(self.loadData_B_Pressed)
+        
         
         #Button for plotting climate
         self.showClimate_B = QtGui.QPushButton("Plot Climate Data", self)
         self.showClimate_B.resize(90, 30)
-        self.showClimate_B.move(self.clmPos, self.top + 125)
+        self.showClimate_B.move(self.clmPos, self.top + 175)
         #self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
         
         
@@ -302,10 +313,11 @@ class Buttons(QtGui.QWidget):
         self.pbar.setWindowTitle("Loading...")
         self.pbar.setLabelText("Loading data from the Arduino and SD-card. \nThis may take several minutes.")
         
+       
         #Button for saving chosen data
         self.saveData_B = QtGui.QPushButton("Save Climate Data", self)
         self.saveData_B.resize(100, 30)
-        self.saveData_B.move(self.clmPos + 90, self.top + 125)
+        self.saveData_B.move(self.clmPos + 90, self.top + 175)
         self.saveData_B.clicked.connect(self.saveData_B_Pressed)
         
         
@@ -361,7 +373,7 @@ class Buttons(QtGui.QWidget):
         self.emCoeff_B.resize(125, 30)
         self.emCoeff_B.move(self.logPos, self.top + 250)
         
-        self.emCoeff_L = QtGui.QLabel("The emission factor is:       ", self)
+        self.emCoeff_L = QtGui.QLabel(self)
         self.emCoeff_L.move(self.logPos, self.top + 225)
         
         #Button for copying climate parameters
@@ -371,17 +383,36 @@ class Buttons(QtGui.QWidget):
         self.copyClimate_B.clicked.connect(self.copyClimate)
         
         
-    
-    def saveData_B_Pressed(self):
+    def printEmCoeff(self, emCoefficient):
+        self.emCoeff_L.setText("The emission factor is: " + str(emCoefficient) + " ")
+
+        
+    def loadData_B_Pressed(self):
         #Check if input is invalid
         if (self.checkUserInput() == "Failure"):
             return
         #Pass the first data point and number of data points
         firstData, nData = self.checkUserInput()
         #Send a message to the Arduino with number of data and starting point
-
-        #Arduino sends: Temp, H, P, Day, Sec        
+        print firstData, nData
+        T = np.zeros(nData)
+        H = np.zeros(nData)
+        P = np.zeros(nData)
+        D = np.zeros(nData)
+        S = np.zeros(nData)
+        self.climateDataM = np.array([T, H, P, D, S])
         
+        print self.climateDataM
+        """
+        #Clear input buffer if any
+        self.buttonSerial.flushInput()
+        self.buttonSerial.write("")
+                
+        
+        while True:
+            pass
+        """
+        #Arduino sends: Temp, H, P, Day, Sec        
         
         
         #Make a statusbar showing progress
@@ -389,11 +420,17 @@ class Buttons(QtGui.QWidget):
         self.pbar.setValue(50)
         
         
-            
         #Input is valid
     
-    #Function for checking the user input. Returns "Failure" if something is wrong.
-    #Or a start measurement and a nr. of measurements for the Arduino.
+        #Function for checking the user input. Returns "Failure" if something is wrong.
+        #Or a start measurement and a nr. of measurements for the Arduino.
+    
+    def saveData_B_Pressed(self):
+        pass
+    
+    def showClimate_B_Pressed(self):
+        pass
+    
     def checkUserInput(self):
         
         #Check if dates have been chosen
@@ -477,7 +514,7 @@ class Buttons(QtGui.QWidget):
                     print "Please write in the given format"
                     continue
                 
-                #Check which button was pressed
+                #Check which button was pressed and change text in GUI
                 if "Start" in sender.text():
                     self.startDay = newDay
                     self.fDayLabel.setText("Start: " + self.startDay)
@@ -552,7 +589,7 @@ class Buttons(QtGui.QWidget):
         self.logThread.stopNow = True
         
        
-    #Bør vise start- og slut klimaparametrer
+    #Bør (Måske) vise start- og slut klimaparametrer
     def makePlot(self, iRArray,  timeArray):
         
         #Show plot after logging is done
@@ -586,7 +623,7 @@ class Buttons(QtGui.QWidget):
         if ok:
             np.savetxt(str(filename)+".txt", iRMatrix, fmt = "%.2f", delimiter = " ", header = theHeader)
             
-    
+    #Function for the user to change the emission coefficient
     def emCoeff_B_Pressed(self):  
         #Prompt user for emission coefficient and run error handling      
         while True:
@@ -608,9 +645,9 @@ class Buttons(QtGui.QWidget):
             else:
                 #Jump out of the function
                 return
-        self.emCoeff = emissionC
-                
+        
         #Send Emission Coefficient
+        self.buttonSerial.write("ChangeEmissivity\n")
         self.buttonSerial.write(str(self.emCoeff))
         
         #Write to GUI

@@ -72,7 +72,6 @@ class Startup(QtGui.QWidget):
          while True:
              #Check serial connection by exception
              try:
-                 #Serial timeout is....?
                  #The Arduino is reset
                  self.ardConnect = serial.Serial(self.port , 9600, timeout = 10)
                  
@@ -93,7 +92,7 @@ class Startup(QtGui.QWidget):
       
             
     #Send the current time after startup for the Arduino
-    def sendReceiveTime(self): 
+    def sendReceive(self): 
         
         #Wait for Arduino to connect
         while(self.ardConnect.inWaiting() == 0):
@@ -118,12 +117,15 @@ class Startup(QtGui.QWidget):
             #Check if the string contains the command for connection            
         if "SutKaktus" in self.line:
                 #Calculate and send days since 31/12-2015
-            self.ardConnect.write(self.timeMes)
-            print "Time is sent" 
-                
+            self.ardConnect.write(str(self.timeMes)+"\n")
+            print "Time is sent "  + str(self.timeMes)
+            
             
         #Variable for first measurement, needed for SD-card readings
         self.firstDay = int(self.ardConnect.readline())
         self.firstSec = int(self.ardConnect.readline())
         print (self.firstDay, self.firstSec)
-        return self.firstDay, self.firstSec
+        #Receive
+        self.emSCoeff = float(self.ardConnect.readline())
+        print "The emcoeff is " + str(self.emSCoeff)
+        return self.firstDay, self.firstSec, self.emSCoeff
