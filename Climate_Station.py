@@ -388,13 +388,13 @@ class Buttons(QtGui.QWidget):
     def printEmCoeff(self, emCoefficient):
         self.emCoeff_L.setText("The emission factor is: " + str(emCoefficient) + " ")
 
-    #Doesn't work yet...    
+    #Function for loading SD-card date into a 
+    # list/matrix called self.climateDataM.
     def loadData_B_Pressed(self):
         
         #Check if input is invalid
         if (self.checkUserInput() == "Failure"):
             return        
-        
         
         #Pass the first data point and number of data points
         firstData, nData = self.checkUserInput()
@@ -406,20 +406,14 @@ class Buttons(QtGui.QWidget):
         self.pbar.setValue(0)
         
         loadConnect = self.buttonSerial        
-        
-        
-        
-        
+                
         print firstData, nData
-        #Allocate a matrix of zeros for all the data
-        T = [0]*nData
-        H = [0]*nData
-        P = [0]*nData
-        D = [0]*nData
-        S = [0]*nData
-        self.climateDataM = ([T, H, P, D, S])
         
-       
+        #Clear list/Matrix from last time
+        self.climateDataM = np.empty
+        #Allocate array (nRows, nColumns)
+        self.climateDataM = np.zeros((nData, 5), float)
+        
         
         #Clear input buffer if any
         loadConnect.flushInput()
@@ -431,7 +425,7 @@ class Buttons(QtGui.QWidget):
                 
         #Load data until stop signal
         while True:
-            
+            #Wait for data
             while loadConnect.inWaiting() == 0:
                 pass
             
@@ -448,35 +442,98 @@ class Buttons(QtGui.QWidget):
             lineArray = line.split(' , ')
             #Convert strings to float
             lineArray = map(float, lineArray)
+            #Write the line of data into the climatedata matrix
+            self.climateDataM[nCounts] = lineArray
             
+            """
+            Removed because of the file handling by Numpy.
+            Only there in case we decide to do it the other way
+            #Convert days lineArray[3] and seconds lineArray[4]
+            # to date and time
+            lineArray[3] = date(2014,12,31) + timedelta(days=lineArray[3])
+            #Convert date to string
+            lineArray[3] = str(lineArray[3])
+            #Get time for at point
+            sec = lineArray[4]
+            m,s=divmod(sec,60)
+            h,m=divmod(m,60)
+            lineArray[4] = str(int(h))+":"+str(int(m))+":"+str(int(s))           
+            """
             
-            
-            for i in range(0, 5):
-                self.climateDataM[i][nCounts] = lineArray[i]
-           
             
             #Increment number of points
             nCounts += 1
-            
+            #Update progress bar
             self.pbar.setValue(nCounts)
         
+        
+        #Remove allocated zeros from matrix
+        self.climateDataM = self.climateDataM[0:nCounts]
+        print self.climateDataM
+        
+        #Set the progress bar to 100 % and close it
         self.pbar.setValue(nData)
         time.sleep(0.4)
         self.pbar.close()
-        #Remove zeros at end
         
-        #Print matrix for test
-        print self.climateDataM
-        
-        
+    #Function for writing data to file.
     def saveData_B_Pressed(self):
-        pass
+        #Get file-name
+        filename, ok = QtGui.QInputDialog.getText(self, "File name", "Choose a file name e. g. 'MyFile\
+        \nThe file will be saved at the current directory'")
+        #The header should contain the start and end dates of the chosen measurements.
+        theHeader = "First day containing data: " + self.startDay + "\nLast day containing data: " + self.endDay
+        #Insert climate parameters in header
+        if ok:
+            np.savetxt(str(filename)+".txt", self.climateDataM, fmt = "%.2f", delimiter = " ", header = theHeader)
+            return
+        else:
+            return
+        
     
     def showClimate_B_Pressed(self):
         pass
     
+    
+    
+    
+    #When 'Change Start' or 'Change End' is pressed    
+    def changeDay(self):
+        #Check which button is pressed
+        sender = self.sender()
+        
+        while True:
+            newDay, ok = QtGui.QInputDialog.getText(self, "Choose a date", "Enter the wanted date in the format: 'dd/mm/yyyy'")
+            #Test user input            
+            if (ok and len(newDay) is 10 and newDay[2] == "/" and newDay[5] == "/"):
+                try:
+                    for i in range(0, 10):
+                        if i != 2 and i != 5:
+                            int(newDay[i])
+                            
+                except ValueError:
+                    print "Please write in the given format"
+                    continue
+                
+                #Check which button was pressed and change text in GUI
+                if "Start" in sender.text():
+                    self.startDay = newDay
+                    self.fDayLabel.setText("Start: " + self.startDay)
+                else:
+                    self.endDay = newDay
+                    self.lDayLabel.setText("End: " + self.endDay)
+                #Break out when parameter and label is changed
+                break
+            #If the string is the wrong length
+            elif ok and len(newDay) is not 10:
+                print "Please write in the given format"
+            
+            #If the user closes the box
+            elif not ok:
+                break
+    
     #Function for checking the user input of the dates. Returns "Failure" if something is wrong.
-        #Or a start measurement and a nr. of measurements for the Arduino.
+    #Or send a start measurement and a nr. of measurements for the Arduino.
     def checkUserInput(self):
         
         #Check if dates have been chosen
@@ -494,6 +551,7 @@ class Buttons(QtGui.QWidget):
         sYear  = int(self.startDay[6:10])
         
         sDate = datetime(sYear, sMonth, sDay)
+        #Start date in days since 31/12/2014
         deltaStartDays = (sDate.date() - startDate).days
         #Slet
         print "Start date: " + str(deltaStartDays)
@@ -505,6 +563,7 @@ class Buttons(QtGui.QWidget):
         eYear  =int(self.endDay[6:10])
         
         eDate = datetime(eYear, eMonth, eDay)
+        #End date in days since 31/12/2014
         deltaEndDays = (eDate.date() - startDate).days
         #Slet
         print "End date: " + str(deltaEndDays)
@@ -546,42 +605,6 @@ class Buttons(QtGui.QWidget):
             return firstData, nData
             
         
-    
-    #When 'Change Start' or 'Change End' is pressed    
-    def changeDay(self):
-        #Check which button is pressed
-        sender = self.sender()
-        
-        while True:
-            newDay, ok = QtGui.QInputDialog.getText(self, "Choose a date", "Enter the wanted date in the format: 'dd/mm/yyyy'")
-            #Test user input            
-            if (ok and len(newDay) is 10 and newDay[2] == "/" and newDay[5] == "/"):
-                try:
-                    for i in range(0, 10):
-                        if i != 2 and i != 5:
-                            int(newDay[i])
-                            
-                except ValueError:
-                    print "Please write in the given format"
-                    continue
-                
-                #Check which button was pressed and change text in GUI
-                if "Start" in sender.text():
-                    self.startDay = newDay
-                    self.fDayLabel.setText("Start: " + self.startDay)
-                else:
-                    self.endDay = newDay
-                    self.lDayLabel.setText("End: " + self.endDay)
-                #Break out when parameter and label is changed
-                break
-            #If the string is the wrong length
-            elif ok and len(newDay) is not 10:
-                print "Please write in the given format"
-            
-            #If the user closes the box
-            elif not ok:
-                break
-           
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
         if self.comboStateU is "Seconds":
@@ -668,7 +691,8 @@ class Buttons(QtGui.QWidget):
         iRMatrix = np.transpose(iRMatrix)
         
         #Get file-name
-        filename, ok = QtGui.QInputDialog.getText(self, "File name", "Choose a file name e. g. 'MyFile'")
+        filename, ok = QtGui.QInputDialog.getText(self, "File name", "Choose a file name e. g. 'MyFile\
+        \nThe file will be saved at the current directory'")
         #Insert climate parameters in header
         if ok:
             np.savetxt(str(filename)+".txt", iRMatrix, fmt = "%.2f", delimiter = " ", header = theHeader)
