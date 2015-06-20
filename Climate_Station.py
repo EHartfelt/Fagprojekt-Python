@@ -232,6 +232,8 @@ class ClimateStationWindow(QtGui.QMainWindow):
     def keyPressEvent(self, e):
         
         if e.key() == QtCore.Qt.Key_Escape:
+            #Close serial port. Consequences?
+            self.serialConnection.close()
             self.close()
     
         
