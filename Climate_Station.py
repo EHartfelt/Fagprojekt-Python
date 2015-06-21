@@ -205,10 +205,10 @@ class Buttons(QtGui.QWidget):
         
         
         #Button for plotting climate
-        self.showClimate_B = QtGui.QPushButton("Plot Climate Data", self)
+        self.showClimate_B = QtGui.QPushButton("Quick Plot", self)
         self.showClimate_B.resize(90, 30)
         self.showClimate_B.move(self.clmPos, self.top + 175)
-        #self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
+        self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
         
         
         #Progress bar that shows for loading data and a button
@@ -310,7 +310,7 @@ class Buttons(QtGui.QWidget):
         
         loadConnect = self.buttonSerial        
                 
-        print firstData, nData
+        
         
         #Clear list/Matrix from last time
         self.climateDataM = np.empty
@@ -336,17 +336,20 @@ class Buttons(QtGui.QWidget):
             #Read line
             line = str(loadConnect.readline())
             
-            
-           
             #Check for stop-signal
             if ("Stop" in line or nCounts == nData):
                 break
             
-            #Read line into array
+            
             #Split line
             lineArray = line.split(' , ')
             
-            if (self.climateDataM[0][2] == 0):
+            #Skip failed measurements (T>900 C), should be done by the Arduino            
+            if float(lineArray[0]) > 100:
+                continue
+                
+            #For first point get the day and second
+            if (nCounts is 0):
                 initDay = int(line.split(' , ')[3])
                 initSec = int(line.split(' , ')[4])
                 
@@ -365,6 +368,7 @@ class Buttons(QtGui.QWidget):
             #Save current date
             curDay = lineArray[3]
             curDate = date(2014,12,31) + timedelta(days=lineArray[3])
+            
             #Get time for at point
             curSec = lineArray[4]
             m,s=divmod(curSec,60)
@@ -387,7 +391,6 @@ class Buttons(QtGui.QWidget):
         
         #Remove allocated zeros from matrix
         self.climateDataM = self.climateDataM[0:nCounts]
-        print self.climateDataM
         
         #Set the progress bar to 100 % and close it
         self.pbar.setValue(nData)
@@ -417,13 +420,63 @@ class Buttons(QtGui.QWidget):
         else:
             return
         
-    
+    #Make a plot of the climate parameters
     def showClimate_B_Pressed(self):
-        pass
-    
-    
-    
-    
+        
+        boxT = dict(facecolor='red', pad=5, alpha=1)
+        boxH = dict(facecolor='blue', pad=5, alpha=1)
+        boxP = dict(facecolor='green', pad=5, alpha=1)
+        
+        #Create figue
+        fig = plt.figure(1)
+        fig.suptitle("Climate parameters")
+        #Get the parameters from the climate matrix
+        temp = self.climateDataM[: , 0]
+        hum = self.climateDataM[:, 1]
+        pres = self.climateDataM[:, 2]
+        sec = self.climateDataM[:, 8]
+        
+        #Get length of matrix to find the last parameter
+        lengthM = len(self.climateDataM) - 1
+        
+        #First date of the datapoints
+        sDate = date(int(self.climateDataM[0, 3]), int(self.climateDataM[0, 4]), int(self.climateDataM[0, 5]))
+        #Last date of the datapoints
+        lDate = date(int(self.climateDataM[lengthM, 3]),\
+        int(self.climateDataM[lengthM, 4]), int(self.climateDataM[lengthM,5]))
+        #Mid date of the datapoints
+        mDate =  sDate + timedelta(days=(lDate - sDate).days/2)
+        
+        #Find first data point in seconds for the day in the middle
+        mDeltaSecs = (mDate - sDate).days*(24*3600)
+
+        
+        
+        
+        
+        
+        #Subplot 1, temp
+        spT = plt.subplot(311)
+        spT.set_ylabel('Temperature', bbox=boxT)
+        spT.axes.get_xaxis().set_visible(False)
+        spT.plot(sec, temp, 'ro-')
+        
+        #Subplot 2, hum
+        spH = plt.subplot(312)
+        spH.set_ylabel('Humidity', bbox=boxH)
+        spH.axes.get_xaxis().set_visible(False)
+        spH.plot(sec, hum, 'bo-')
+        
+        #Subplot 3, pres
+        spP = plt.subplot(313)
+        spP.set_ylabel('Pressure', bbox=boxP)
+        spP.plot(sec, pres, 'go-')
+        
+        plt.xticks([0, mDeltaSecs,int(self.climateDataM[lengthM, 8])], [str(sDate), str(mDate), str(lDate)], rotation=45)
+        plt.tight_layout()
+        fig.show()
+        
+      
     #When 'Change Start' or 'Change End' is pressed    
     def changeDay(self):
         #Check which button is pressed
