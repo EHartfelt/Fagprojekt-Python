@@ -156,13 +156,13 @@ class Buttons(QtGui.QWidget):
         #Start and end day chosen by user
         self.startDay = None
         self.endDay = None
-        #Array of climate data (Not used yet)
+        #Array of climate data 
         self.climateDataM = None
-        #IR-Emission Coefficient [0.1;1.0]
+        #IR-Emission Coefficient 
         self.emCoeff = None
         #Initiate buttons
         self.initButtons()
-        #Flag for data
+        #Flag for if IR data exists
         self.isData = False
       
         
@@ -447,11 +447,21 @@ class Buttons(QtGui.QWidget):
         #Mid date of the datapoints
         mDate =  sDate + timedelta(days=(lDate - sDate).days/2)
         
-        #Find first data point in seconds for the day in the middle
-        mDeltaSecs = (mDate - sDate).days*(24*3600)
-
+        #Find first data point in seconds for the first day in the middle
+        # and the last day
+        mDeltaSecs = (mDate - sDate).days*(24*3600) - self.climateDataM[0, 5]*3600 - self.climateDataM[0, 6]*60
+        lDeltaSecs = (lDate - sDate).days*(24*3600) - self.climateDataM[0, 5]*3600 - self.climateDataM[0, 6]*60
         
         
+        #Get the index in the climate matrix where the first values are
+        # for the mid date and last date
+        mRow = np.where(self.climateDataM[:, 8]>=mDeltaSecs)
+        mRow = np.asanyarray(mRow)
+        mRow = int(mRow[0][0])
+        
+        lRow = np.where(self.climateDataM[:, 8]>=lDeltaSecs)
+        lRow = np.asanyarray(lRow)
+        lRow = int(lRow[0][0])
         
         
         
@@ -472,7 +482,8 @@ class Buttons(QtGui.QWidget):
         spP.set_ylabel('Pressure', bbox=boxP)
         spP.plot(sec, pres, 'go-')
         
-        plt.xticks([0, mDeltaSecs,int(self.climateDataM[lengthM, 8])], [str(sDate), str(mDate), str(lDate)], rotation=45)
+        #Show 3 dates on the x-axis
+        plt.xticks([0, int(self.climateDataM[mRow, 8]), int(self.climateDataM[lRow, 8])],[str(sDate), str(mDate), str(lDate)], rotation=45)
         plt.tight_layout()
         fig.show()
         
