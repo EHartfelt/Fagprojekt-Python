@@ -18,6 +18,7 @@ import time
 from datetime import datetime, date, timedelta
 #Work with arrays, plots and math
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import math 
 #Other parts of the code
@@ -388,7 +389,7 @@ class Buttons(QtGui.QWidget):
         
         
     def printEmCoeff(self, emCoefficient):
-        self.emCoeff_L.setText("The emission factor is: " + str(emCoefficient) + " ")
+        self.emCoeff_L.setText("The emission factor is: " + str(emCoefficient) + "   ")
 
     #Function for loading SD-card date into a 
     # list/matrix called self.climateDataM.
@@ -414,7 +415,7 @@ class Buttons(QtGui.QWidget):
         #Clear list/Matrix from last time
         self.climateDataM = np.empty
         #Allocate array (nRows, nColumns)
-        self.climateDataM = np.zeros((nData, 5), float)
+        self.climateDataM = np.zeros((nData, 9), float)
         
         
         #Clear input buffer if any
@@ -435,6 +436,8 @@ class Buttons(QtGui.QWidget):
             #Read line
             line = str(loadConnect.readline())
             
+            
+           
             #Check for stop-signal
             if ("Stop" in line or nCounts == nData):
                 break
@@ -442,26 +445,39 @@ class Buttons(QtGui.QWidget):
             #Read line into array
             #Split line
             lineArray = line.split(' , ')
+            
+            if (self.climateDataM[0][2] == 0):
+                initDay = int(line.split(' , ')[3])
+                initSec = int(line.split(' , ')[4])
+                
+                
+            #Add array indices for days, hours and minutes and secs from start
+            lineArray.append(0)
+            lineArray.append(0)
+            lineArray.append(0)
+            lineArray.append(0)
+            
             #Convert strings to float
             lineArray = map(float, lineArray)
+            
+            #Convert days lineArray[3] and seconds lineArray[4]
+            # to date and time in [3][4][5][6][7][8]
+            #Save current date
+            curDay = lineArray[3]
+            curDate = date(2014,12,31) + timedelta(days=lineArray[3])
+            #Get time for at point
+            curSec = lineArray[4]
+            m,s=divmod(curSec,60)
+            h,m=divmod(m,60)
+            lineArray[3] = int(curDate.year)
+            lineArray[4] = int(curDate.month)
+            lineArray[5] = int(curDate.day)
+            lineArray[6] = int(h)
+            lineArray[7] = int(m)
+            lineArray[8] = int((curDay-initDay)*86400 + (curSec - initSec))
+            
             #Write the line of data into the climatedata matrix
             self.climateDataM[nCounts] = lineArray
-            
-            """
-            Removed because of the file handling by Numpy.
-            Only there in case we decide to do it the other way
-            #Convert days lineArray[3] and seconds lineArray[4]
-            # to date and time
-            lineArray[3] = date(2014,12,31) + timedelta(days=lineArray[3])
-            #Convert date to string
-            lineArray[3] = str(lineArray[3])
-            #Get time for at point
-            sec = lineArray[4]
-            m,s=divmod(sec,60)
-            h,m=divmod(m,60)
-            lineArray[4] = str(int(h))+":"+str(int(m))+":"+str(int(s))           
-            """
-            
             
             #Increment number of points
             nCounts += 1
@@ -485,9 +501,13 @@ class Buttons(QtGui.QWidget):
         \nThe file will be saved at the current directory'")
         #The header should contain the start and end dates of the chosen measurements.
         theHeader = "First day containing data: " + self.startDay + "\nLast day containing data: " + self.endDay
+        
+        columnNames = ["Temperature (C)", "Humidity (%)", "Pressure (mbar)",\
+        "Year", "Month", "Day", "Hour", "Minute", "Seconds since start (for easy plotting)"]        
         #Insert climate parameters in header
         if ok:
-            np.savetxt(str(filename)+".txt", self.climateDataM, fmt = "%.2f", delimiter = " ", header = theHeader)
+            dataFile = pd.DataFrame(self.climateDataM, columns = columnNames)
+            dataFile.to_csv(filename+".csv", header = theHeader, sep = ',')
             return
         else:
             return
@@ -703,8 +723,8 @@ class Buttons(QtGui.QWidget):
     def emCoeff_B_Pressed(self):  
         #Prompt user for emission coefficient and run error handling      
         while True:
-            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient", "Enter the emission coefficient of the material\n \
-            (between 0.10 and 1.00)")
+            emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient",\
+            "Enter the emission coefficient of the material (between 0.10 and 1.00).\nPlease turn off the Arduino and start it again before continuing.")
             if ok:
                 try:
                     emissionC = float(emissionC)
