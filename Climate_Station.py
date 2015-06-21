@@ -16,116 +16,15 @@ from PyQt4 import QtCore, QtGui
 import time
 #To get time in days since 31/12-2014 and seconds since midnight
 from datetime import datetime, date, timedelta
-#Work with arrays, plots and math
+#Work with arrays, files, plots and math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import math 
 #Other parts of the code
 from Startup import Startup
+from LogThread import LogThread
 
-#A thread for logging, runs simultaneously with the main window
-class LogThread(QtCore.QThread):
-    def __init__(self):
-        QtCore.QThread.__init__(self)
-        self.stopNow = False
-        self.threadSerial = None
-        self.timeNow = None
-        self.logTime = 0
-        self.start_Thread_Climate = None
-        self.end_Thread_Climate = None
-        #Number of measured points
-        self.n = 0
-    
-    def run(self):
-        
-        self.n = 0        
-        
-        self.start_Thread_Climate = self.getClimate()    
-        
-        #Allocate arrays
-        self.iRArray = np.zeros(100*self.logTime)     
-        self.timeArray = np.zeros(100*self.logTime)
-        
-        #Remove items on the buffer (if any)
-        self.threadSerial.flushInput()
-        
-        #Write command to Arduino
-        self.threadSerial.write("IRStart\n")
-        
-        
-        #Wait for response
-        while (self.threadSerial.inWaiting == 0):
-                pass
-                
-        #Get starting time
-        startTime = time.clock()    
-        
-        #Run the logging
-        #Find ud af optimal rækkefølge
-        while True:
-            #Wait for input
-            while (self.threadSerial.inWaiting == 0):
-                pass
-            
-            #Calculate the time
-            timeNow = time.clock() - startTime
-            
-            #Stop after chosen time has passed
-            if (timeNow >= self.logTime or self.stopNow):
-                self.threadSerial.write("IRStop\n")
-                time.sleep(0.5)
-                #Slet
-                print "I wrote stop"
-                #Remove data on the buffer
-                self.threadSerial.flushInput()
-                #Get climate at end
-                self.end_Thread_Climate = self.getClimate() 
-                #Set stop flag to false for next logging
-                self.stopNow = False
-                break
-            
-            #Get IR value
-            line = self.threadSerial.readline()
-            value = float(line)
-            
-            #Write to arrays
-            self.iRArray[self.n] = value
-            self.timeArray[self.n] = timeNow
-            self.n += 1
-            
-         
-        #Remove empty indices. Go to n because n is incremented one last time
-        #before the while loop ends
-        self.timeArray = self.timeArray[0:self.n]
-        self.iRArray = self.iRArray[0:self.n]
-        
-        
-        #Emits signal: 1. Receive QtCore.SIGNAL('startlogging'), then send iRArray and timeArray
-        self.emit(QtCore.SIGNAL('startlogging'), self.iRArray, self.timeArray)
-        
-            
-        return    
-    
-    #Send message to the Arduino to pass on the current climate parameters.
-    def getClimate(self):
-        
-        arConnect = self.threadSerial
-        arConnect.write("CopyClimate\n")
-        time.sleep(0.1)
-        #Read temperature, humidity and pressure.
-        #Convert to floats to get rid of \n and then to strings.
-        lineTemp = str(round(float(arConnect.readline()), 1))
-        lineHum = str(float(arConnect.readline()))
-        lineP = str(float(arConnect.readline()))
-        #Get the current time
-        timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
-        
-        climateText = "Temperature: " + lineTemp + " C , Humidity: " + lineHum \
-        + " % , Pressure: " + lineP + " mb" + " ; Time: " + timeNow
-        
-        return climateText
-            
 
 #Main class, initiates main window and other objects
 class ClimateStationWindow(QtGui.QMainWindow):
@@ -176,7 +75,6 @@ class ClimateStationWindow(QtGui.QMainWindow):
         qPainter.drawLine(730, 360, 730, 55)
         qPainter.drawLine(730, 55, 610, 55)
 
-          
     
     def runMain(self):
         
@@ -264,6 +162,8 @@ class Buttons(QtGui.QWidget):
         self.emCoeff = None
         #Initiate buttons
         self.initButtons()
+        #Flag for data
+        self.isData = False
       
         
     #Make the buttons
@@ -496,6 +396,11 @@ class Buttons(QtGui.QWidget):
         
     #Function for writing data to file.
     def saveData_B_Pressed(self):
+        #Check if data is loaded
+        if self.climateDataM is None:
+            print "No data is loaded!"
+            return
+        
         #Get file-name
         filename, ok = QtGui.QInputDialog.getText(self, "File name", "Choose a file name e. g. 'MyFile\
         \nThe file will be saved at the current directory'")
@@ -677,6 +582,8 @@ class Buttons(QtGui.QWidget):
         self.connect(self.logThread, QtCore.SIGNAL('startlogging'), self.makePlot)
         #Run the funcion run() in the thread
         self.logThread.start()
+        
+        self.isData = True
     
     #When the stop button is pressed   
     def stop_B_Pressed(self):
@@ -701,24 +608,35 @@ class Buttons(QtGui.QWidget):
     #Right now it saves the file to the same location as the current path.
     #Bør give brugeren mulighed for at vælge path
     def writeIRFile(self):
+        
+        if not self.isData:
+            print "No temperature data is available, run logging"
+            return
+        
+        #Get the arrays
         iRArray = self.logThread.iRArray
         timeArray = self.logThread.timeArray
-
+        #Start and end climate parameters for a measurement
         atStart = self.logThread.start_Thread_Climate
-        atEnd = self.logThread.end_Thread_Climate        
-        theHeader = str(atStart) + "\n" + str(atEnd) + "\n" + "Column 1: Time in seconds, Column 2: Temperature in Celsius"
-        
+        atEnd = self.logThread.end_Thread_Climate 
+        #Make header and column names
+        theHeader = "Start parameters: ," + str(atStart) + "\n" + "End parameters  : ," + str(atEnd)\
+        + "\nTime in seconds, " + "Temperature in C (IR)"
         length = len(timeArray) 
         iRMatrix = np.array([timeArray[1:length], iRArray[1:length]])
         iRMatrix = np.transpose(iRMatrix)
+        #Reduce to 2 decimals
+        iRMatrix = np.around(iRMatrix, decimals = 2)
         
         #Get file-name
         filename, ok = QtGui.QInputDialog.getText(self, "File name", "Choose a file name e. g. 'MyFile\
         \nThe file will be saved at the current directory'")
         #Insert climate parameters in header
         if ok:
-            np.savetxt(str(filename)+".txt", iRMatrix, fmt = "%.2f", delimiter = " ", header = theHeader)
-            
+            np.savetxt(filename+".csv", iRMatrix, fmt = "%.2f", header = theHeader, delimiter = ",")
+        else:
+            return
+         
     #Function for the user to change the emission coefficient
     def emCoeff_B_Pressed(self):  
         #Prompt user for emission coefficient and run error handling      
@@ -766,7 +684,7 @@ class Buttons(QtGui.QWidget):
         timeNow = time.strftime("%d/%m-%Y, %H:%M:%S")
         
         climateText = "Temperature: " + lineTemp + " C , Humidity: " + lineHum \
-        + " % , Pressure: " + lineP + " mb" + " ; Time: " + timeNow
+        + " % , Pressure: " + lineP + " mb" + " , Time: " + timeNow
         
         return climateText
         
@@ -795,6 +713,5 @@ def main():
 #__name__ is a class attribute containing the name
 if __name__ == "__main__":
     main()
-       
         
         
