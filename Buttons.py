@@ -184,10 +184,9 @@ class Buttons(QtGui.QWidget):
         #Check if input is invalid
         if (self.checkUserInput() == "Failure"):
             return
-        #Check if IR logging is running
-        
+        #Check if IR logging is running        
         if(self.logThread.isRunning()):
-            print "ERROR: IR logging is running! Please stop it before loadning data."
+            print "ERROR: IR logging is running! Please stop it before loading data."
             return
         
         #Pass the first data point and number of data points
@@ -199,10 +198,9 @@ class Buttons(QtGui.QWidget):
         self.pbar.show()
         self.pbar.setValue(0)
         
+        #Assign serial connection
         loadConnect = self.buttonSerial        
                 
-        
-        
         #Clear list/Matrix from last time
         self.climateDataM = np.empty
         #Allocate array (nRows, nColumns)
@@ -239,7 +237,6 @@ class Buttons(QtGui.QWidget):
             if float(lineArray[0]) > 200:
                 continue
                 """
-                
                 
             #For first point get the day and second
             if (nCounts is 0):
@@ -317,6 +314,11 @@ class Buttons(QtGui.QWidget):
     #Something is wrong with the dates
     def showClimate_B_Pressed(self):
         
+        #Check if there's any data
+        if self.climateDataM is None:
+            print "No data has been loaded!"
+            return
+        
         boxT = dict(facecolor='red', pad=5, alpha=1)
         boxH = dict(facecolor='blue', pad=5, alpha=1)
         boxP = dict(facecolor='green', pad=5, alpha=1)
@@ -356,7 +358,6 @@ class Buttons(QtGui.QWidget):
         lRow = np.where(self.climateDataM[:, 8]>=lDeltaSecs)
         lRow = np.asanyarray(lRow)
         lRow = int(lRow[0][0])
-        
         
         
         #Subplot 1, temp
@@ -532,7 +533,10 @@ class Buttons(QtGui.QWidget):
     #When the start button is pressed
             #Lav helst et label der blinker
     def start_B_Pressed(self):
-        
+        #Check if thread is already running
+        if self.logThread.isRunning():
+            print "Logging already running"
+            return
         #Pass on the serial connection, logging time and emission coefficient
         self.logThread.threadSerial = self.buttonSerial
         self.logThread.logTime = self.logTime
@@ -549,7 +553,6 @@ class Buttons(QtGui.QWidget):
         self.logThread.stopNow = True
         
         
-       
     #Bør (Måske) vise start- og slut klimaparametrer
     def makeIRPlot(self, iRArray,  timeArray):
         
@@ -567,12 +570,16 @@ class Buttons(QtGui.QWidget):
     #Right now it saves the file to the same location as the current path.
     #Bør give brugeren mulighed for at vælge path
     def writeIRFile(self):
+        #Check if logging is running
+        if self.logThread.isRunning():
+            print "Please wait for logging to stop before writing a file"
+            return
         
         if not self.isData:
             print "No temperature data is available, run logging"
             return
         
-        #Get the arrays
+        #Acess last run thread to get wanted parameters
         iRArray = self.logThread.iRArray
         timeArray = self.logThread.timeArray
         #Start and end climate parameters for a measurement
@@ -598,6 +605,11 @@ class Buttons(QtGui.QWidget):
          
     #Function for the user to change the emission coefficient
     def emCoeff_B_Pressed(self):  
+        #Check if logging is running
+        if self.logThread.isRunning():
+            print "IR logging is running, stop it or wait for it to finish"
+            return
+        
         #Prompt user for emission coefficient and run error handling      
         while True:
             emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient",\
@@ -652,7 +664,11 @@ class Buttons(QtGui.QWidget):
     #Copy climate data into clipboard   
     #Bør skrive i statusbar'en for at bekræfte at den har kopieret data
     def copyClimate(self):
-         
+        #Check if logging is running
+        if self.logThread.isRunning():
+            print "Please wait for logging to stop before getting parameters."
+            return
+            
         clipBoardText = self.getClimate()
         #Make clipboard parameter
         clipboard = QtGui.QApplication.clipboard()
