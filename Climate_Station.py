@@ -8,6 +8,8 @@ This code could not have been written if it wasn't for the tutorial on:
 http://zetcode.com/gui/pyqt4/
 Small parts an pieces have been taken directly from there.
 
+The entire program is run by running this file.
+
 """
 #For the GUI
 import sys

@@ -50,7 +50,6 @@ class Buttons(QtGui.QWidget):
         self.initButtons()
         
       
-        
     #Make the buttons
     def initButtons(self):
         #Variables for layout        
@@ -58,25 +57,27 @@ class Buttons(QtGui.QWidget):
         self.clmPos = 50
         self.logPos = 450
         
-        #Label
+        #Create a thread for logging
+        self.logThread = LogThread()
+        
+        #Label, climate data
         self.plotLabel = QtGui.QLabel("<b>Climate Data</b>", self)
         self.plotLabel.move(self.clmPos, self.top)
-        #Label
+        #Label, button info
         self.dateLabel = QtGui.QLabel("<b>Choose a time interval (in days) to plot/save climate data</b>", self)
         self.dateLabel.move(self.clmPos, self.top + 30)
-
+        #Label, date chosen
         self.fDayLabel = QtGui.QLabel("Start: <i>None chosen</i>", self)
         self.fDayLabel.move(self.clmPos, self.top + 50) 
-        
-        
+        #Button for changing first day
         self.fDayButton = QtGui.QPushButton("Change Start", self)
         self.fDayButton.clicked.connect(self.changeDay)
         self.fDayButton.move(self.clmPos + 175, self.top + 50)
         self.fDayButton.resize(80, 20)
-        
+        #Label, date chosen
         self.lDayLabel = QtGui.QLabel("End:  <i>None chosen</i>", self)
         self.lDayLabel.move(self.clmPos, self.top + 75)
-        
+        #Button for changing last day
         self.lDayButton = QtGui.QPushButton("Change End", self)
         self.lDayButton.clicked.connect(self.changeDay)
         self.lDayButton.move(self.clmPos + 175, self.top + 70)
@@ -88,13 +89,11 @@ class Buttons(QtGui.QWidget):
         self.loadData_B.move(self.clmPos, self.top + 120)
         self.loadData_B.clicked.connect(self.loadData_B_Pressed)
         
-        
         #Button for plotting climate
         self.showClimate_B = QtGui.QPushButton("Quick Plot", self)
         self.showClimate_B.resize(90, 30)
         self.showClimate_B.move(self.clmPos, self.top + 175)
         self.showClimate_B.clicked.connect(self.showClimate_B_Pressed)
-        
         
         #Progress bar that shows for loading data and a button
         self.pbar = QtGui.QProgressDialog(self)
@@ -103,15 +102,13 @@ class Buttons(QtGui.QWidget):
         self.pbar.setLabelText("Loading data from the Arduino and SD-card. \nThis may take several minutes.\n\
         The program will be frozen while loading.")
         
-       
         #Button for saving chosen data
         self.saveData_B = QtGui.QPushButton("Save Climate Data", self)
         self.saveData_B.resize(100, 30)
         self.saveData_B.move(self.clmPos + 90, self.top + 175)
         self.saveData_B.clicked.connect(self.saveData_B_Pressed)
         
-        
-        #Title (needs frame preferably)
+        #Title, left frame
         self.logLabel = QtGui.QLabel("<b> Data Logging for IR sensor </b>", self)
         self.logLabel.move(self.logPos, self.top)
         
@@ -141,7 +138,9 @@ class Buttons(QtGui.QWidget):
         #Label for logging
         self.lowLogLabel = QtGui.QLabel("<b>Run Logging</b>", self)
         self.lowLogLabel.move(self.logPos, self.top + 140)
-           
+        
+        #(Label for when log is running?)        
+        
         #Buttons for logging
         self.start_B = QtGui.QPushButton("Start Logging", self)
         self.start_B.clicked.connect(self.start_B_Pressed)
@@ -158,6 +157,7 @@ class Buttons(QtGui.QWidget):
         self.saveIR_B.resize(80,30)
         self.saveIR_B.move(self.logPos + 2*80, self.top + 160)
         
+        #Emission factor button and label
         self.emCoeff_B = QtGui.QPushButton("Change Emission Factor", self)
         self.emCoeff_B.clicked.connect(self.emCoeff_B_Pressed)
         self.emCoeff_B.resize(125, 30)
@@ -172,7 +172,8 @@ class Buttons(QtGui.QWidget):
         self.copyClimate_B.move(self.logPos - 200, self.top + 350)
         self.copyClimate_B.clicked.connect(self.copyClimate)
         
-        
+    #Function for printing the emission coefficient in the window
+    # called by mainwindow
     def printEmCoeff(self, emC):
         self.emCoeff_L.setText("The emission factor is: " + str(emC) + "   ")
 
@@ -182,7 +183,12 @@ class Buttons(QtGui.QWidget):
         
         #Check if input is invalid
         if (self.checkUserInput() == "Failure"):
-            return        
+            return
+        #Check if IR logging is running
+        
+        if(self.logThread.isRunning()):
+            print "ERROR: IR logging is running! Please stop it before loadning data."
+            return
         
         #Pass the first data point and number of data points
         firstData, nData = self.checkUserInput()
@@ -228,10 +234,11 @@ class Buttons(QtGui.QWidget):
             
             #Split line
             lineArray = line.split(' , ')
-            
-            #Skip failed measurements (T>900 C), should be done by the Arduino            
+            """
+            #Skip failed measurements (T>200 C), should be done by the Arduino            
             if float(lineArray[0]) > 200:
                 continue
+                """
                 
                 
             #For first point get the day and second
@@ -485,6 +492,7 @@ class Buttons(QtGui.QWidget):
         
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
+        print self.logThread.isFinished()
         if self.comboStateU is "Seconds":
             self.comboStateU = "Minutes"
         else:
@@ -524,8 +532,7 @@ class Buttons(QtGui.QWidget):
     #When the start button is pressed
             #Lav helst et label der blinker
     def start_B_Pressed(self):
-        #Create a thread for logging
-        self.logThread = LogThread()
+        
         #Pass on the serial connection, logging time and emission coefficient
         self.logThread.threadSerial = self.buttonSerial
         self.logThread.logTime = self.logTime
@@ -540,6 +547,7 @@ class Buttons(QtGui.QWidget):
     def stop_B_Pressed(self):
         #Set stop flag in the logging thread
         self.logThread.stopNow = True
+        
         
        
     #Bør (Måske) vise start- og slut klimaparametrer
@@ -593,7 +601,8 @@ class Buttons(QtGui.QWidget):
         #Prompt user for emission coefficient and run error handling      
         while True:
             emissionC, ok = QtGui.QInputDialog.getText(self, "Choose emission coefficient",\
-            "Enter the emission coefficient of the material (between 0.10 and 1.00).\nPlease turn off the Arduino and start it again before continuing.")
+            "Enter the emission coefficient of the material (between 0.10 and 1.00).\
+            \nPlease turn off the Arduino, start it again and restart the GUI before continuing.")
             if ok:
                 try:
                     emissionC = float(emissionC)
