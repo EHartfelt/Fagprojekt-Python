@@ -28,8 +28,8 @@ class LogThread(QtCore.QThread):
         self.start_Thread_Climate = self.getClimate()    
         
         #Allocate arrays
-        self.iRArray = np.zeros(100*self.logTime)     
-        self.timeArray = np.zeros(100*self.logTime)
+        iRArray = np.zeros(100*self.logTime)     
+        timeArray = np.zeros(100*self.logTime)
         
         #Remove items on the buffer (if any)
         self.threadSerial.flushInput()
@@ -74,19 +74,19 @@ class LogThread(QtCore.QThread):
             value = float(line)
             
             #Write to arrays
-            self.iRArray[self.n] = value
-            self.timeArray[self.n] = timeNow
+            iRArray[self.n] = value
+            timeArray[self.n] = timeNow
             self.n += 1
             
          
         #Remove empty indices. Go to n because n is incremented one last time
         #before the while loop ends
-        self.timeArray = self.timeArray[0:self.n]
-        self.iRArray = self.iRArray[0:self.n]
+        timeArray = timeArray[0:self.n]
+        iRArray = iRArray[0:self.n]
         
         
         #Emits signal: 1. Receive QtCore.SIGNAL('startlogging'), then send iRArray and timeArray
-        self.emit(QtCore.SIGNAL('startlogging'), self.iRArray, self.timeArray)
+        self.emit(QtCore.SIGNAL('startlogging'), iRArray, timeArray)
            
         return    
     

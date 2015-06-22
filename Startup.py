@@ -24,7 +24,16 @@ class Startup(QtGui.QWidget):
     #Initiate
     def __init__(self):
         super(Startup, self).__init__()
+        #Emission coefficient
         self.emSCoeff = None
+        #Serial connection
+        self.ardConnect = None
+        #Serial Status
+        self.status = None
+        #Days and second of first measurement
+        self.firstDay = None
+        self.firstSec = None
+        #Serial port name
         self.port = self.showDialog()
         
          
@@ -59,16 +68,15 @@ class Startup(QtGui.QWidget):
                         
             #If "Cancel" or X is pressed (Add another option for getting serial port)
             else:
-                #Program closes. Might need a different approach.
+                #Program closes. 
                 print "Program is closed"
                 sys.exit()
-            
+        #Return COM - port in string    
         return text
     
     
     #Method for checking for serial connection and returning a string  
     def initSerial(self):
-         
          
          while True:
              #Check serial connection by exception
@@ -83,7 +91,6 @@ class Startup(QtGui.QWidget):
                      return self.status, self.ardConnect
                      break
               
-                   
             #If connection fails, prompt for serial port again
              except serial.serialutil.SerialException:
                 print "Serial Port was unable to open"
@@ -100,26 +107,25 @@ class Startup(QtGui.QWidget):
             pass
         
         #Calculate days since 31/12-2014 and seconds since midnight
-        self.d = datetime.now()
-        self.d1 = date(self.d.year, self.d.month, self.d.day)
-        self.d0 = date(2014,12,31)
-        self.delta = self.d1-self.d0
+        d = datetime.now()
+        d1 = date(d.year, d.month, d.day)
+        d0 = date(2014,12,31)
+        delta = d1-d0
         
         #Convert days and secs to strings
-        self.nDays = str(self.delta.days)
-        self.secOfDay = str((self.d.hour*60 + self.d.minute)*60 + self.d.second)
+        nDays = str(delta.days)
+        secOfDay = str((d.hour*60 + d.minute)*60 + d.second)
         
-        self.timeMes = self.nDays + " , " + self.secOfDay
-        
-        #while True:
+        timeMes = nDays + " , " + secOfDay
+                
         #Read line
-        self.line = self.ardConnect.readline()
+        line = self.ardConnect.readline()
           
             #Check if the string contains the command for connection            
-        if "SutKaktus" in self.line:
-                #Calculate and send days since 31/12-2015
-            self.ardConnect.write(str(self.timeMes)+"\n")
-            print "Time is sent "  + str(self.timeMes)
+        if "SutKaktus" in line:
+                #Send days since 31/12-2015 to Arduino
+            self.ardConnect.write(str(timeMes)+"\n")
+            print "Time is sent "  + str(timeMes)
             
             
         #Variable for first measurement, needed for SD-card readings
