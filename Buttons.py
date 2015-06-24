@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jun 22 12:07:15 2015
+This code is written as part of an application for at climate monitor
+constisting of an arduino connected to sensors, an SD-card reader and
+an LCD-screen and a GUI made by this code. The arduino will have to be
+programmed to communicate with the GUI for the monitor to work properly.
 
-@author: Emil
+The other files required for the program to run are:
+Climate_Station.py
+Startup.py
+LogThread.py
 """
 #For the GUI
 from PyQt4 import QtGui, QtCore
@@ -20,7 +26,8 @@ from LogThread import LogThread
 
 
 
-#Class for creating all the buttons. Contains methods for when a button is pressed.
+#Class for creating everything inside the main window.
+#Also connects to the LogThread() object when an IR logging is run.
 class Buttons(QtGui.QWidget):
     #Constructor
     def __init__(self):

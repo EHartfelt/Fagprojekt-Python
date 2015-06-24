@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jun 15 10:25:55 2015
-
-@author: Emil
-
 This Startup object is the one that initializes the serial connection by
 prompting the user for a USB port (COM), establishing connection with the 
 Arduino and sending the current time and receiving the first day and time where
 there is data on the SD card.
 
+This code is written as part of an application for at climate monitor
+constisting of an arduino connected to sensors, an SD-card reader and
+an LCD-screen and a GUI made by this code. The arduino will have to be
+programmed to communicate with the GUI for the monitor to work properly.
+
+The other files required for the program to run are:
+Buttons.py
+Climate_Station.py
+LogThread.py
 """
 
 
@@ -53,7 +58,6 @@ class Startup(QtGui.QWidget):
                         #Break out when a valid string is entered
                         break
                     else:
-                        #(Add a dialog box)
                         print 'Please write the name of a valid serial port, e.g. "COM1"'
                 #If the user enters 5 letters (COMxx)    
                 elif len(text) is 5:
@@ -61,7 +65,6 @@ class Startup(QtGui.QWidget):
                         #Break out of while loop, when a valid string is entered 
                         break
                     else:
-                        #(Add a dialog box)
                         print 'Please write the name of a valid serial port, e.g. "COM1"'
                 else:
                     print 'Please write the name of a valid serial port, e.g. "COM1"'                    
@@ -71,7 +74,7 @@ class Startup(QtGui.QWidget):
                 #Program closes. 
                 print "Program is closed"
                 sys.exit()
-        #Return COM - port in string    
+        #Return COM-port in string    
         return text
     
     
@@ -81,10 +84,11 @@ class Startup(QtGui.QWidget):
          while True:
              #Check serial connection by exception
              try:
-                 #The Arduino is reset
+                 #Establish serial connection, resets the arduino
                  self.ardConnect = serial.Serial(self.port , 9600, timeout = 10)
-                 
+                 #Small delay
                  time.sleep(1)
+                 #If connection return status and connection
                  if self.ardConnect is not None:
                      #String for printing serial status         
                      self.status = "Chosen port is: " + self.port.upper() + "  Status: Connected"
@@ -99,7 +103,8 @@ class Startup(QtGui.QWidget):
             
       
             
-    #Send the current time after startup for the Arduino
+    #Send the current time, receive day and second for first measurement
+    # on SD-card and get the emission factor on the sensor.
     def sendReceive(self): 
         
         #Wait for Arduino to connect
@@ -121,9 +126,9 @@ class Startup(QtGui.QWidget):
         #Read line
         line = self.ardConnect.readline()
           
-            #Check if the string contains the command for connection            
+        #Check if the string contains the command for connection            
         if "SutKaktus" in line:
-                #Send days since 31/12-2015 to Arduino
+            #Send days since 31/12-2015 to Arduino
             self.ardConnect.write(str(timeMes)+"\n")
             print "Time is sent "  + str(timeMes)
             
@@ -131,9 +136,11 @@ class Startup(QtGui.QWidget):
         #Variable for first measurement, needed for SD-card readings
         self.firstDay = int(self.ardConnect.readline())
         self.firstSec = int(self.ardConnect.readline())
+        #Slet
         print (self.firstDay, self.firstSec)
         #Receive
         self.emSCoeff = float(self.ardConnect.readline())
+        #Slet
         print "The emcoeff is " + str(self.emSCoeff)
         
         return self.firstDay, self.firstSec, self.emSCoeff

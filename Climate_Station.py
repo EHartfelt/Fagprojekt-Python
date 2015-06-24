@@ -1,15 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Jun 07 12:41:04 2015
+This code is written as part of an application for at climate monitor
+constisting of an arduino connected to sensors, an SD-card reader and
+an LCD-screen and a GUI made by this code. The arduino will have to be
+programmed to communicate with the GUI for the monitor to work properly.
 
-@author: Emil
+The other files required for the program to run are:
+Buttons.py
+Startup.py
+LogThread.py
 
-This code could not have been written if it wasn't for the tutorial on:
+The program could not have been written if it wasn't for the tutorial on:
 http://zetcode.com/gui/pyqt4/
 Small parts an pieces have been taken directly from there.
 
 The entire program is run by running this file.
-
 """
 #For the GUI
 import sys
@@ -26,15 +31,20 @@ class ClimateStationWindow(QtGui.QMainWindow):
     def __init__(self):
         #Inherit from QtGui.QMainWindow and initiate
         super(ClimateStationWindow, self).__init__()
+        #Array with parameters from Startup()
         self.things = None
+        #Day and second of first data point
         self.firstDay = None
         self.firstSec = None
+        #Emission factor
         self.emCoeffS = None
         self.serialStatus = None
         self.serialConnection = None
+        #Run initialization and main
         self.initUI()
         self.runMain()
     
+    #Set window size and title
     def initUI(self):
         #Window geometry
         self.setGeometry(100, 75, 750, 450)
@@ -51,7 +61,7 @@ class ClimateStationWindow(QtGui.QMainWindow):
         qPainter.begin(self)
         self.drawLines(qPainter)
         qPainter.end()
-        
+    #Function for drawing frames in main window    
     def drawLines(self, qPainter):
       
         pen = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.SolidLine)
@@ -69,7 +79,8 @@ class ClimateStationWindow(QtGui.QMainWindow):
         qPainter.drawLine(730, 360, 730, 55)
         qPainter.drawLine(730, 55, 610, 55)
 
-    
+    #Main function. Runs startup and passes its parameters
+    # to the Button() object.
     def runMain(self):
         
         #Create instance of standby          
