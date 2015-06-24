@@ -130,17 +130,13 @@ class Startup(QtGui.QWidget):
         if "SutKaktus" in line:
             #Send days since 31/12-2015 to Arduino
             self.ardConnect.write(str(timeMes)+"\n")
-            print "Time is sent "  + str(timeMes)
             
-            
+           
         #Variable for first measurement, needed for SD-card readings
         self.firstDay = int(self.ardConnect.readline())
         self.firstSec = int(self.ardConnect.readline())
-        #Slet
-        print (self.firstDay, self.firstSec)
+        
         #Receive
         self.emSCoeff = float(self.ardConnect.readline())
-        #Slet
-        print "The emcoeff is " + str(self.emSCoeff)
         
         return self.firstDay, self.firstSec, self.emSCoeff

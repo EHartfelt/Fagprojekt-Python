@@ -169,7 +169,8 @@ class Buttons(QtGui.QWidget):
         self.saveIR_B.move(self.logPos + 2*80, self.top + 160)
         
         #Create empty label for showing if IR logging is running
-        self.isRunning_L = QtGui.QLabel("(Test text, remove           ", self)
+        self.isRunning_L = QtGui.QLabel("                             ", self)
+        self.isRunning_L.setStyleSheet("color: red")
         self.isRunning_L.move(self.logPos, self.top + 200)
         
         #Emission factor button and label
@@ -249,8 +250,7 @@ class Buttons(QtGui.QWidget):
         sDate = datetime(sYear, sMonth, sDay)
         #Start date in days since 31/12/2014
         deltaStartDays = (sDate.date() - startDate).days
-        #Slet
-        print "Start date: " + str(deltaStartDays)
+        
         
         #Get the end date from the user input string (field variable) and 
         #convert to days since 31/12/2014
@@ -261,8 +261,7 @@ class Buttons(QtGui.QWidget):
         eDate = datetime(eYear, eMonth, eDay)
         #End date in days since 31/12/2014
         deltaEndDays = (eDate.date() - startDate).days
-        #Slet
-        print "End date: " + str(deltaEndDays)
+        
         
         
         #Check if the start date comes before the end
@@ -562,6 +561,7 @@ class Buttons(QtGui.QWidget):
         if self.logThread.isRunning():
             print "Logging already running"
             return
+            
         #Pass on the serial connection, logging time and emission coefficient
         self.logThread.threadSerial = self.buttonSerial
         self.logThread.logTime = self.logTime
@@ -569,6 +569,8 @@ class Buttons(QtGui.QWidget):
         self.connect(self.logThread, QtCore.SIGNAL('startlogging'), self.makeIRPlot)
         #Run the funcion run() in the thread
         self.logThread.start()
+        #Print to IR-label
+        self.isRunning_L.setText("IR-logging Active!")
         
         self.isData = True
     
@@ -578,8 +580,11 @@ class Buttons(QtGui.QWidget):
         self.logThread.stopNow = True
         
         
-    #Bør (Måske) vise start- og slut klimaparametrer
+    #This function is called automatically after the LogThread() object
+    # has been run and has returned the IR parameters.
     def makeIRPlot(self, iRArray,  timeArray):
+        #Remove IR logging label. 
+        self.isRunning_L.setText("                                    ")
         
         #Show plot after logging is done
         m = len(iRArray)
