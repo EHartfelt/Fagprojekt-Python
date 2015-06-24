@@ -59,31 +59,36 @@ class Buttons(QtGui.QWidget):
       
     #Make the buttons
     def initButtons(self):
-        #Variables for layout        
+        #Variables for layout, nr of pixels   
         self.top = 50
         self.clmPos = 50
         self.logPos = 450
         
-        #Create a thread for logging
+        #Create a thread for logging, will be run by the 'Start'-button
         self.logThread = LogThread()
         
         #Label, climate data
         self.plotLabel = QtGui.QLabel("<b>Climate Data</b>", self)
         self.plotLabel.move(self.clmPos, self.top)
+        
         #Label, button info
         self.dateLabel = QtGui.QLabel("<b>Choose a time interval (in days) to plot/save climate data</b>", self)
         self.dateLabel.move(self.clmPos, self.top + 30)
+        
         #Label, date chosen
         self.fDayLabel = QtGui.QLabel("Start: <i>None chosen</i>", self)
         self.fDayLabel.move(self.clmPos, self.top + 50) 
+        
         #Button for changing first day
         self.fDayButton = QtGui.QPushButton("Change Start", self)
         self.fDayButton.clicked.connect(self.changeDay)
         self.fDayButton.move(self.clmPos + 175, self.top + 50)
         self.fDayButton.resize(80, 20)
+        
         #Label, date chosen
         self.lDayLabel = QtGui.QLabel("End:  <i>None chosen</i>", self)
         self.lDayLabel.move(self.clmPos, self.top + 75)
+        
         #Button for changing last day
         self.lDayButton = QtGui.QPushButton("Change End", self)
         self.lDayButton.clicked.connect(self.changeDay)
@@ -120,16 +125,16 @@ class Buttons(QtGui.QWidget):
         self.logLabel.move(self.logPos, self.top)
         
         
-        #Before running a data logging
+        #Label, logging time
         self.timeLabel = QtGui.QLabel("<b>Choose logging time</b>", self)
         self.timeLabel.move(self.logPos, self.top + 35)
         
-        #Set logging time with button
+        #Label, show chosen logigng time
         self.timeChosen_L = QtGui.QLabel("The logging time is: 0 seconds                          \
                        ", self)
         self.timeChosen_L.move(self.logPos, self.top + 60)
         
-        #Button for changing the logging tim value
+        #Button for changing the logging time value
         self.chaTime_B = QtGui.QPushButton("Change", self)
         self.chaTime_B.resize(80, 30)
         self.chaTime_B.clicked.connect(self.changeTime)
@@ -140,14 +145,13 @@ class Buttons(QtGui.QWidget):
         self.unitBox.addItem("Seconds")
         self.unitBox.addItem("Minutes")
         self.unitBox.move(self.logPos + 80, self.top + 82)
+        #Connect box to function that changes timeChosen_L label
         self.unitBox.activated[str].connect(self.onActivated)
         
         #Label for logging
         self.lowLogLabel = QtGui.QLabel("<b>Run Logging</b>", self)
         self.lowLogLabel.move(self.logPos, self.top + 140)
-        
-        #(Label for when log is running?)        
-        
+    
         #Buttons for logging
         self.start_B = QtGui.QPushButton("Start Logging", self)
         self.start_B.clicked.connect(self.start_B_Pressed)
@@ -163,6 +167,10 @@ class Buttons(QtGui.QWidget):
         self.saveIR_B.clicked.connect(self.writeIRFile)
         self.saveIR_B.resize(80,30)
         self.saveIR_B.move(self.logPos + 2*80, self.top + 160)
+        
+        #Create empty label for showing if IR logging is running
+        self.isRunning_L = QtGui.QLabel("(Test text, remove           ", self)
+        self.isRunning_L.move(self.logPos, self.top + 200)
         
         #Emission factor button and label
         self.emCoeff_B = QtGui.QPushButton("Change Emission Factor", self)
@@ -183,20 +191,131 @@ class Buttons(QtGui.QWidget):
     # called by mainwindow
     def printEmCoeff(self, emC):
         self.emCoeff_L.setText("The emission factor is: " + str(emC) + "   ")
-
-    #Function for loading SD-card date into a 
-    # list/matrix called self.climateDataM.
+        
+    #When 'Change Start' or 'Change End' is pressed    
+    def changeDay(self):
+        #Check which button is pressed
+        sender = self.sender()
+        
+        #Loop for user error handling
+        while True:
+            newDay, ok = QtGui.QInputDialog.getText(self, "Choose a date", "Enter the wanted date in the format: 'dd/mm/yyyy'")
+            #Test user input            
+            if (ok and len(newDay) is 10 and newDay[2] == "/" and newDay[5] == "/"):
+                try:
+                    for i in range(0, 10):
+                        if i != 2 and i != 5:
+                            int(newDay[i])
+                #If error in format            
+                except ValueError:
+                    print "Please write in the given format"
+                    continue
+                
+                #Check which button was pressed and change text in GUI correspondingly
+                if "Start" in sender.text():
+                    self.startDay = newDay
+                    self.fDayLabel.setText("Start: " + self.startDay)
+                else:
+                    self.endDay = newDay
+                    self.lDayLabel.setText("End: " + self.endDay)
+                #Break out when parameter and label is changed
+                break
+            #If the string is the wrong length
+            elif ok and len(newDay) is not 10:
+                print "Please write in the given format"
+            
+            #If the user closes the box
+            elif not ok:
+                break
+    
+    #Function for checking the user input of the dates. Returns "Failure" if something is wrong.
+    #Or send a start measurement and a nr. of measurements for the Arduino to handle.
+    def checkUserInput(self):
+        
+        #Check if dates have been chosen
+        if self.startDay is None or self.endDay is None:
+            print "Please choose start- and end dates"
+            return "Failure"
+        
+        #Our time starts after 31/12/2014
+        startDate = date(2014,12,31)
+        
+        #Get the start date from the user input string (field variable) and 
+        #convert to days since 31/12/2014
+        sDay = int(self.startDay[0:2])
+        sMonth = int(self.startDay[3:5])
+        sYear  = int(self.startDay[6:10])
+        #Make a datetime parameter
+        sDate = datetime(sYear, sMonth, sDay)
+        #Start date in days since 31/12/2014
+        deltaStartDays = (sDate.date() - startDate).days
+        #Slet
+        print "Start date: " + str(deltaStartDays)
+        
+        #Get the end date from the user input string (field variable) and 
+        #convert to days since 31/12/2014
+        eDay = int(self.endDay[0:2])
+        eMonth = int(self.endDay[3:5])
+        eYear  =int(self.endDay[6:10])
+        
+        eDate = datetime(eYear, eMonth, eDay)
+        #End date in days since 31/12/2014
+        deltaEndDays = (eDate.date() - startDate).days
+        #Slet
+        print "End date: " + str(deltaEndDays)
+        
+        
+        #Check if the start date comes before the end
+        if (deltaEndDays < deltaStartDays):
+            print "ERROR: End date comes before Start date"
+            return "Failure"
+        
+        #Check if the data exists
+        if deltaStartDays < self.firstDay:
+            #First date containing data
+            firstDate = date(2014,12,31) + timedelta(days=self.firstDay)
+            
+            #Print error
+            print "ERROR: The start date is before the first day containing data."\
+            + "\nThe first day with data is: " + str(firstDate.day) + "/" + str(firstDate.month) + "/" + str(firstDate.year)
+            return "Failure"
+            
+        #If the end day is in the future
+        if deltaEndDays > (datetime.now().date() - startDate).days:
+            print "ERROR: The end day is in the future!"
+            return "Failure"
+        
+        #If the start date is NOT the first day containing data
+        #and startDate != endDate, then return first datapoint and number of points.
+        if (deltaStartDays != self.firstDay):
+            firstData = int(math.floor((deltaStartDays - self.firstDay)*288 -(self.firstSec/300)))
+            nData = (deltaEndDays - deltaStartDays + 1)*288
+            return firstData, nData
+            
+        #If the start date is the same as the first day containing data
+        if deltaStartDays == self.firstDay:
+            #Start from measurement nr. 1
+            firstData = 0
+            #Find nr. of datapoints
+            nData = (deltaEndDays - deltaStartDays)*288 + (24*3600-self.firstSec)/300
+            return firstData, nData
+            
+        
+    #Function for loading SD-card date into the
+    # matrix called self.climateDataM.
     def loadData_B_Pressed(self):
         
-        #Check if input is invalid
+        #Check if input of the chosen dates is invalid
         if (self.checkUserInput() == "Failure"):
             return
-        #Check if IR logging is running        
+            
+        #Check if IR logging is running     
         if(self.logThread.isRunning()):
             print "ERROR: IR logging is running! Please stop it before loading data."
             return
         
-        #Pass the first data point and number of data points
+        #Pass the first data point and number of data points. Number
+        #of data points also contain zeros on SD-card made to keep track of time.
         firstData, nData = self.checkUserInput()
         
         #Make a statusbar showing progress
@@ -216,6 +335,8 @@ class Buttons(QtGui.QWidget):
         
         #Clear input buffer if any
         loadConnect.flushInput()
+        #Write to arduino, send command for getting data, the first datapoint
+        # and the number of datapoints it should send.
         loadConnect.write("ClimateHistory\n")
         loadConnect.write(str(firstData)+"\n")
         loadConnect.write(str(nData)+"\n")
@@ -235,7 +356,6 @@ class Buttons(QtGui.QWidget):
             #Check for stop-signal
             if ("Stop" in line or nCounts == nData):
                 break
-            
             
             #Split line
             lineArray = line.split(' , ')
@@ -257,24 +377,30 @@ class Buttons(QtGui.QWidget):
             lineArray.append(0)
             lineArray.append(0)
             
-            #Convert strings to float
+            #Convert strings to floats
             lineArray = map(float, lineArray)
             
-            #Convert days lineArray[3] and seconds lineArray[4]
-            # to date and time in [3][4][5][6][7][8]
-            #Save current date
+           
+            #Save current day and date 
             curDay = lineArray[3]
-            curDate = date(2014,12,31) + timedelta(days=lineArray[3])
+            #Get current date
+            curDate = date(2014,12,31) + timedelta(days=curDay)
             
-            #Get time for at point
+            #Convert days lineArray[3] and seconds lineArray[4]
+            # to date and time in [3][4][5][6][7][8].
+            #Get time for at point in seconds and convert to hh:mm
             curSec = lineArray[4]
+            #Convert seconds to hh:mm
             m,s=divmod(curSec,60)
             h,m=divmod(m,60)
+            #Save year, month and day in array
             lineArray[3] = int(curDate.year)
             lineArray[4] = int(curDate.month)
             lineArray[5] = int(curDate.day)
+            #Save hour and minute of day
             lineArray[6] = int(h)
             lineArray[7] = int(m)
+            #Column for seconds since start. Made for easy plotting as x-axis.
             lineArray[8] = int((curDay-initDay)*86400 + (curSec - initSec))
             
             #Write the line of data into the climatedata matrix
@@ -339,10 +465,10 @@ class Buttons(QtGui.QWidget):
         pres = self.climateDataM[:, 2]
         sec = self.climateDataM[:, 8]
         
-        #Get length of matrix to find the last parameter
+        #Get length of matrix to find index of the last parameter
         lengthM = len(self.climateDataM) - 1
         
-        #First date of the datapoints
+        #First date of the datapoints, date(year, month, day)
         sDate = date(int(self.climateDataM[0, 3]), int(self.climateDataM[0, 4]), int(self.climateDataM[0, 5]))
         #Last date of the datapoints
         lDate = date(int(self.climateDataM[lengthM, 3]),\
@@ -352,8 +478,8 @@ class Buttons(QtGui.QWidget):
         
         #Find first data point in seconds for the first day in the middle
         # and the last day
-        mDeltaSecs = (mDate - sDate).days*(24*3600) - self.climateDataM[0, 5]*3600 - self.climateDataM[0, 6]*60
-        lDeltaSecs = (lDate - sDate).days*(24*3600) - self.climateDataM[0, 5]*3600 - self.climateDataM[0, 6]*60
+        mDeltaSecs = (mDate - sDate).days*(24*3600) - self.climateDataM[0, 6]*3600 - self.climateDataM[0, 7]*60
+        lDeltaSecs = (lDate - sDate).days*(24*3600) - self.climateDataM[0, 6]*3600 - self.climateDataM[0, 7]*60
         
         
         #Get the index in the climate matrix where the first values are
@@ -390,114 +516,6 @@ class Buttons(QtGui.QWidget):
         fig.show()
         
       
-    #When 'Change Start' or 'Change End' is pressed    
-    def changeDay(self):
-        #Check which button is pressed
-        sender = self.sender()
-        
-        while True:
-            newDay, ok = QtGui.QInputDialog.getText(self, "Choose a date", "Enter the wanted date in the format: 'dd/mm/yyyy'")
-            #Test user input            
-            if (ok and len(newDay) is 10 and newDay[2] == "/" and newDay[5] == "/"):
-                try:
-                    for i in range(0, 10):
-                        if i != 2 and i != 5:
-                            int(newDay[i])
-                            
-                except ValueError:
-                    print "Please write in the given format"
-                    continue
-                
-                #Check which button was pressed and change text in GUI
-                if "Start" in sender.text():
-                    self.startDay = newDay
-                    self.fDayLabel.setText("Start: " + self.startDay)
-                else:
-                    self.endDay = newDay
-                    self.lDayLabel.setText("End: " + self.endDay)
-                #Break out when parameter and label is changed
-                break
-            #If the string is the wrong length
-            elif ok and len(newDay) is not 10:
-                print "Please write in the given format"
-            
-            #If the user closes the box
-            elif not ok:
-                break
-    
-    #Function for checking the user input of the dates. Returns "Failure" if something is wrong.
-    #Or send a start measurement and a nr. of measurements for the Arduino.
-    def checkUserInput(self):
-        
-        #Check if dates have been chosen
-        if self.startDay is None or self.endDay is None:
-            print "Please choose start- and end dates"
-            return "Failure"
-        
-        #Our time starts after 31/12/2014
-        startDate = date(2014,12,31)
-        
-        #Get the start date from the user input string and 
-        #convert to days since 31/12/2014
-        sDay = int(self.startDay[0:2])
-        sMonth = int(self.startDay[3:5])
-        sYear  = int(self.startDay[6:10])
-        
-        sDate = datetime(sYear, sMonth, sDay)
-        #Start date in days since 31/12/2014
-        deltaStartDays = (sDate.date() - startDate).days
-        #Slet
-        print "Start date: " + str(deltaStartDays)
-        
-        #Get the end date from the user input string and 
-        #convert to days since 31/12/2014
-        eDay = int(self.endDay[0:2])
-        eMonth = int(self.endDay[3:5])
-        eYear  =int(self.endDay[6:10])
-        
-        eDate = datetime(eYear, eMonth, eDay)
-        #End date in days since 31/12/2014
-        deltaEndDays = (eDate.date() - startDate).days
-        #Slet
-        print "End date: " + str(deltaEndDays)
-        
-        
-        #Check if the start date comes before the end
-        if (deltaEndDays < deltaStartDays):
-            print "ERROR: End date comes before Start date"
-            return "Failure"
-        
-        #Check if the data exists
-        if deltaStartDays < self.firstDay:
-            #First date containing data
-            firstDate = date(2014,12,31) + timedelta(days=self.firstDay)
-            
-            #Print error
-            print "ERROR: The start date is before the first day containing data."\
-            + "\nThe first day with data is: " + str(firstDate.day) + "/" + str(firstDate.month) + "/" + str(firstDate.year)
-            return "Failure"
-            
-        #If the end day is in the future
-        if deltaEndDays > (datetime.now().date() - startDate).days:
-            print "ERROR: The end day is in the future!"
-            return "Failure"
-        
-        #If the start date is NOT the first day containing data
-        #And startDate != endDate?
-        if (deltaStartDays != self.firstDay):
-            firstData = int(math.floor((deltaStartDays - self.firstDay)*288 -(self.firstSec/300)))
-            nData = (deltaEndDays - deltaStartDays + 1)*288
-            return firstData, nData
-            
-        #If the start date is the same as the first day containing data
-        if deltaStartDays == self.firstDay:
-            #Start from measurement nr. 1
-            firstData = 0
-            #Find nr. of datapoints
-            nData = (deltaEndDays - deltaStartDays)*288 + (24*3600-self.firstSec)/300
-            return firstData, nData
-            
-        
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
         print self.logThread.isFinished()
