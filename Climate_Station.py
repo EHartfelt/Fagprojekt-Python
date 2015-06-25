@@ -127,7 +127,6 @@ class ClimateStationWindow(QtGui.QMainWindow):
             
         if (reply == QtGui.QMessageBox.Yes):
             event.accept()
-                
         else:
             event.ignore()
             
@@ -135,8 +134,9 @@ class ClimateStationWindow(QtGui.QMainWindow):
     def keyPressEvent(self, e):
         
         if e.key() == QtCore.Qt.Key_Escape:
-            #Close serial port. Consequences?
+            #Close serial port.
             self.serialConnection.close()
+            #Close the program
             self.close()
     
     
