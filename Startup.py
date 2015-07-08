@@ -14,6 +14,8 @@ The other files required for the program to run are:
 Buttons.py
 Climate_Station.py
 LogThread.py
+DataThread.py
+
 """
 
 
