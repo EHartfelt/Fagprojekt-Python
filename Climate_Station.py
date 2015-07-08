@@ -9,7 +9,6 @@ The other files required for the program to run are:
 Buttons.py
 Startup.py
 LogThread.py
-DataThread.py
 
 The program could not have been written if it wasn't for the tutorial on:
 http://zetcode.com/gui/pyqt4/

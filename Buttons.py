@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 This code is written as part of an application for at climate monitor
 constisting of an arduino connected to sensors, an SD-card reader and
@@ -9,7 +9,6 @@ The other files required for the program to run are:
 Climate_Station.py
 Startup.py
 LogThread.py
-DataThread.py
 """
 #For the GUI
 from PyQt4 import QtGui, QtCore
@@ -24,7 +23,6 @@ import matplotlib.pyplot as plt
 import math 
 #Import LogThread for running IR logging in parallel with window
 from LogThread import LogThread
-from DataThread import DataThread
 
 
 
@@ -57,10 +55,6 @@ class Buttons(QtGui.QWidget):
         self.isData = False
         #Initiate buttons
         self.initButtons()
-        #Create a thread for logging, will be run by the 'Start'-button
-        self.logThread = LogThread()
-        #Create thread object
-        self.dataThread = DataThread()
         
       
     #Make the buttons
@@ -70,7 +64,8 @@ class Buttons(QtGui.QWidget):
         self.clmPos = 50
         self.logPos = 450
         
-        
+        #Create a thread for logging, will be run by the 'Start'-button
+        self.logThread = LogThread()
         
         #Label, climate data
         self.plotLabel = QtGui.QLabel("<b>Climate Data</b>", self)
@@ -114,10 +109,10 @@ class Buttons(QtGui.QWidget):
         
         #Progress bar that shows for loading data and a button
         self.pbar = QtGui.QProgressDialog(self)
-        self.pbar.setWindowTitle("Loading...")
         self.pbar.setCancelButton(None)
-        self.pbar.setLabelText("Loading data from the Arduino and SD-card \nThis may take several minutes\n\
-        The statusbar can't be closed meanwhile ")
+        self.pbar.setWindowTitle("Loading...")
+        self.pbar.setLabelText("Loading data from the Arduino and SD-card. \nThis may take several minutes.\n\
+        The program will be frozen while loading.")
         
         #Button for saving chosen data
         self.saveData_B = QtGui.QPushButton("Save Climate Data", self)
@@ -317,9 +312,6 @@ class Buttons(QtGui.QWidget):
         if(self.logThread.isRunning()):
             print "ERROR: IR logging is running! Please stop it before loading data."
             return
-        if self.dataThread.isRunning():
-            print "Data is already loading, please wait"
-            return
         
         #Pass the first data point and number of data points. Number
         #of data points also contain zeros on SD-card made to keep track of time.
@@ -331,29 +323,101 @@ class Buttons(QtGui.QWidget):
         self.pbar.show()
         self.pbar.setValue(0)
         
+        #Assign serial connection
+        loadConnect = self.buttonSerial        
+                
+        #Clear list/Matrix from last time
+        self.climateDataM = np.empty
+        #Allocate array (nRows, nColumns)
+        self.climateDataM = np.zeros((nData, 9), float)
         
-        #Pass serial connection, first data point and number of data points
-        self.dataThread.dTSerial = self.buttonSerial
-        self.dataThread.dFirstData = firstData
-        self.dataThread.dNData = nData
-        #Connect signals for updating pbar and for getting data
-        self.connect(self.dataThread, QtCore.SIGNAL('updatebar'), self.updateSBar)
-        self.connect(self.dataThread, QtCore.SIGNAL('getdata'), self.getData)
-        #Start thread
-        self.dataThread.start()
-    
-    #Function for updating statusbar
-    def updateSBar(self, i):
-        self.pbar.setValue(i)
         
-    #Function (signal slot) for getting data    
-    def getData(self, dataM):
-        time.sleep(0.5)
+        #Clear input buffer if any
+        loadConnect.flushInput()
+        #Write to arduino, send command for getting data, the first datapoint
+        # and the number of datapoints it should send.
+        loadConnect.write("ClimateHistory\n")
+        loadConnect.write(str(firstData)+"\n")
+        loadConnect.write(str(nData)+"\n")
+        
+        nCounts = 0
+                
+        #Load data until stop signal
+        while True:
+            #Wait for data
+            while loadConnect.inWaiting() == 0:
+                pass
+            
+            #Arduino sends: Temp, H, P, Day, Sec 
+            #Read line
+            line = str(loadConnect.readline())
+            
+            #Check for stop-signal
+            if ("Stop" in line or nCounts == nData):
+                break
+            
+            #Split line
+            lineArray = line.split(' , ')
+            """
+            #Skip failed measurements (T>200 C), should be done by the Arduino            
+            if float(lineArray[0]) > 200:
+                continue
+                """
+                
+            #For first point get the day and second
+            if (nCounts is 0):
+                initDay = int(line.split(' , ')[3])
+                initSec = int(line.split(' , ')[4])
+                
+                
+            #Add array indices for days, hours and minutes and secs from start
+            lineArray.append(0)
+            lineArray.append(0)
+            lineArray.append(0)
+            lineArray.append(0)
+            
+            #Convert strings to floats
+            lineArray = map(float, lineArray)
+            
+           
+            #Save current day and date 
+            curDay = lineArray[3]
+            #Get current date
+            curDate = date(2014,12,31) + timedelta(days=curDay)
+            
+            #Convert days lineArray[3] and seconds lineArray[4]
+            # to date and time in [3][4][5][6][7][8].
+            #Get time for at point in seconds and convert to hh:mm
+            curSec = lineArray[4]
+            #Convert seconds to hh:mm
+            m,s=divmod(curSec,60)
+            h,m=divmod(m,60)
+            #Save year, month and day in array
+            lineArray[3] = int(curDate.year)
+            lineArray[4] = int(curDate.month)
+            lineArray[5] = int(curDate.day)
+            #Save hour and minute of day
+            lineArray[6] = int(h)
+            lineArray[7] = int(m)
+            #Column for seconds since start. Made for easy plotting as x-axis.
+            lineArray[8] = int((curDay-initDay)*86400 + (curSec - initSec))
+            
+            #Write the line of data into the climatedata matrix
+            self.climateDataM[nCounts] = lineArray
+            
+            #Increment number of points
+            nCounts += 1
+            #Update progress bar
+            self.pbar.setValue(nCounts)
+        
+        
+        #Remove allocated zeros from matrix
+        self.climateDataM = self.climateDataM[0:nCounts]
+        
+        #Set the progress bar to 100 % and close it
+        self.pbar.setValue(nData)
+        time.sleep(0.4)
         self.pbar.close()
-        self.pbar.reset()
-        self.climateDataM = dataM
-        
-        
         
     #Function for writing data to file.
     def saveData_B_Pressed(self):
@@ -453,6 +517,7 @@ class Buttons(QtGui.QWidget):
       
     #Function for when user changes the state of the unit combobox
     def onActivated(self):
+        print self.logThread.isFinished()
         if self.comboStateU is "Seconds":
             self.comboStateU = "Minutes"
         else:
@@ -495,9 +560,6 @@ class Buttons(QtGui.QWidget):
         #Check if thread is already running
         if self.logThread.isRunning():
             print "Logging already running"
-            return
-        if self.dataThread.isRunning():
-            print "Data is loading, please wait"
             return
             
         #Pass on the serial connection, logging time and emission coefficient
@@ -577,9 +639,6 @@ class Buttons(QtGui.QWidget):
         if self.logThread.isRunning():
             print "IR logging is running, stop it or wait for it to finish"
             return
-        if self.dataThread.isRunning():
-            print "Data is loading, please wait"
-            return    
         
         #Prompt user for emission coefficient and run error handling      
         while True:
@@ -638,9 +697,6 @@ class Buttons(QtGui.QWidget):
         #Check if logging is running
         if self.logThread.isRunning():
             print "Please wait for logging to stop before getting parameters."
-            return
-        if self.dataThread.isRunning():
-            print "Data is loading, please wait"
             return
             
         clipBoardText = self.getClimate()

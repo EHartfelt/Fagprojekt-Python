@@ -9,7 +9,6 @@ The other files required for the program to run are:
 Startup.py
 Climate_Station.py
 Buttons.py
-DataThread.py
 
 """
 from PyQt4 import QtCore
